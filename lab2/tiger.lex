@@ -40,6 +40,25 @@ void adjust(void)
     for  {adjust(); return FOR;}
     [0-9]+	 {adjust(); yylval.ival=atoi(yytext); return INT;}
   */
+
+<NORMAL>"while" {adjust(); return WHILE;}
+<NORMAL>"for" {adjust(); return FOR;}
+<NORMAL>"to" {adjust(); return TO;}
+<NORMAL>"break" {adjust(); return BREAK;}
+<NORMAL>"let" {adjust(); return LET;}
+<NORMAL>"in" {adjust(); return IN;}
+<NORMAL>"end" {adjust(); return END;}
+<NORMAL>"function" {adjust(); return FUNCTION;}
+<NORMAL>"var" {adjust(); return VAR;}
+<NORMAL>"type" {adjust(); return TYPE;}
+<NORMAL>"array" {adjust(); return ARRAY;}
+<NORMAL>"if" {adjust(); return IF;}
+<NORMAL>"then" {adjust(); return THEN;}
+<NORMAL>"else" {adjust(); return ELSE;}
+<NORMAL>"do" {adjust(); return DO;}
+<NORMAL>"of" {adjust(); return OF;}
+<NORMAL>"nil" {adjust(); return NIL;}
+
 <NORMAL>"/*" {adjust(); BEGIN COMMENT;}
 
 <NORMAL>. {adjust(); EM_error(EM_tokPos, "illegal token");}
