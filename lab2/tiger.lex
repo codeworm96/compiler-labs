@@ -23,19 +23,27 @@ void adjust(void)
 */
 
 %}
+
   /* You can add lex definitions here. */
+
+%Start NORMAL COMMENT STR
 
 %%
   /* 
   * Below are some examples, which you can wipe out
   * and write reguler expressions and actions of your own.
   */ 
+  /*
+    " "  {adjust(); continue;} 
+    \n	 {adjust(); EM_newline(); continue;}
+    ","	 {adjust(); return COMMA;}
+    for  {adjust(); return FOR;}
+    [0-9]+	 {adjust(); yylval.ival=atoi(yytext); return INT;}
+  */
+<NORMAL>"/*" {adjust(); BEGIN COMMENT;}
 
-" "  {adjust(); continue;} 
-\n	 {adjust(); EM_newline(); continue;}
-","	 {adjust(); return COMMA;}
-for  {adjust(); return FOR;}
-[0-9]+	 {adjust(); yylval.ival=atoi(yytext); return INT;}
-.	 {adjust(); EM_error(EM_tokPos,"illegal token");}
-
+<NORMAL>. {adjust(); EM_error(EM_tokPos, "illegal token");}
+<COMMENT>"*/" {adjust(); BEGIN NORMAL;}
+<COMMENT>. {adjust();}
+. {BEGIN NORMAL; yyless(1);}
 
