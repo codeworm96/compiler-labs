@@ -36,8 +36,6 @@ void adjust(void)
   /*
     " "  {adjust(); continue;} 
     \n	 {adjust(); EM_newline(); continue;}
-    ","	 {adjust(); return COMMA;}
-    for  {adjust(); return FOR;}
     [0-9]+	 {adjust(); yylval.ival=atoi(yytext); return INT;}
   */
 
@@ -60,6 +58,31 @@ void adjust(void)
 <NORMAL>"nil" {adjust(); return NIL;}
 
 <NORMAL>"/*" {adjust(); BEGIN COMMENT;}
+
+<NORMAL>":=" {adjust(); return ASSIGN;}
+<NORMAL>"<>" {adjust(); return NEQ;}
+<NORMAL>"<=" {adjust(); return LE;}
+<NORMAL>">=" {adjust(); return GE;}
+<NORMAL>"<" {adjust(); return LT;}
+<NORMAL>">" {adjust(); return GT;}
+<NORMAL>"=" {adjust(); return EQ;}
+<NORMAL>"," {adjust(); return COMMA;}
+<NORMAL>":" {adjust(); return COLON;}
+<NORMAL>";" {adjust(); return SEMICOLON;}
+<NORMAL>"(" {adjust(); return LPAREN;}
+<NORMAL>")" {adjust(); return RPAREN;}
+<NORMAL>"[" {adjust(); return LBRACK;}
+<NORMAL>"]" {adjust(); return RBRACK;}
+<NORMAL>"{" {adjust(); return LBRACE;}
+<NORMAL>"}" {adjust(); return RBRACE;}
+<NORMAL>"." {adjust(); return DOT;}
+<NORMAL>"+" {adjust(); return PLUS;}
+<NORMAL>"-" {adjust(); return MINUS;}
+<NORMAL>"*" {adjust(); return TIMES;}
+<NORMAL>"/" {adjust(); return DIVIDE;}
+<NORMAL>"&" {adjust(); return AND;}
+<NORMAL>"|" {adjust(); return OR;}
+
 
 <NORMAL>. {adjust(); EM_error(EM_tokPos, "illegal token");}
 <COMMENT>"*/" {adjust(); BEGIN NORMAL;}
