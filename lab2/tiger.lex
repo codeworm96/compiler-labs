@@ -35,9 +35,6 @@ digit [0-9]
   * Below are some examples, which you can wipe out
   * and write reguler expressions and actions of your own.
   */ 
-  /*
-    [0-9]+	 {adjust(); yylval.ival=atoi(yytext); return INT;}
-  */
 
 <NORMAL>"while" {adjust(); return WHILE;}
 <NORMAL>"for" {adjust(); return FOR;}
@@ -87,6 +84,7 @@ digit [0-9]
 <NORMAL>\n {adjust(); EM_newline(); continue;}
 
 <NORMAL>letter(letter|digit|_)* {adjust(); yylval.sval=yytext; return ID;}
+<NORMAL>digit+ {adjust(); yylval.ival=atoi(yytext); return INT;}
 
 <NORMAL>. {adjust(); EM_error(EM_tokPos, "illegal token");}
 <COMMENT>"*/" {adjust(); BEGIN NORMAL;}
