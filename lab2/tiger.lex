@@ -22,6 +22,9 @@ void adjust(void)
 * You can add C declarations of your own below.
 */
 
+#define MAX_STR_LIT 1024
+static char strbuf[MAX_STR_LIT];
+static int cur;
 %}
 
   /* You can add lex definitions here. */
@@ -80,17 +83,17 @@ digit [0-9]
 <NORMAL>"&" {adjust(); return AND;}
 <NORMAL>"|" {adjust(); return OR;}
 
-<NORMAL>"\"" {adjust(); BEGIN STR;}
+<NORMAL>\" {adjust(); cur = 0; BEGIN STR;}
 
 <NORMAL>" "|\t {adjust(); continue;} 
 <NORMAL>\n {adjust(); EM_newline(); continue;}
 
-<NORMAL>{letter}({letter}|{digit}|_)* {adjust(); yylval.sval=yytext; return ID;}
+<NORMAL>{letter}({letter}|{digit}|_)* {adjust(); yylval.sval=String(yytext); return ID;}
 <NORMAL>{digit}+ {adjust(); yylval.ival=atoi(yytext); return INT;}
 
 <NORMAL>. {adjust(); EM_error(EM_tokPos, "illegal token");}
-<STR>"\"" {adjust(); BEGIN NORMAL;}
-<STR>. {adjust();}
+<STR>\" {charPos += yyleng; BEGIN NORMAL; strbuf[cur] = '\0'; yylval.sval = String(strbuf); return STRING;}
+<STR>. {charPos += yyleng; strcpy(strbuf + cur, yytext); cur += yyleng;}
 <COMMENT>"*/" {adjust(); BEGIN NORMAL;}
 <COMMENT>. {adjust();}
 . {BEGIN NORMAL; yyless(0);}
