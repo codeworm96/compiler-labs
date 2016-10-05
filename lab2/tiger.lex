@@ -80,14 +80,18 @@ digit [0-9]
 <NORMAL>"&" {adjust(); return AND;}
 <NORMAL>"|" {adjust(); return OR;}
 
+<NORMAL>"\"" {adjust(); BEGIN STR;}
+
 <NORMAL>" "|\t {adjust(); continue;} 
 <NORMAL>\n {adjust(); EM_newline(); continue;}
 
-<NORMAL>letter(letter|digit|_)* {adjust(); yylval.sval=yytext; return ID;}
-<NORMAL>digit+ {adjust(); yylval.ival=atoi(yytext); return INT;}
+<NORMAL>{letter}({letter}|{digit}|_)* {adjust(); yylval.sval=yytext; return ID;}
+<NORMAL>{digit}+ {adjust(); yylval.ival=atoi(yytext); return INT;}
 
 <NORMAL>. {adjust(); EM_error(EM_tokPos, "illegal token");}
+<STR>"\"" {adjust(); BEGIN NORMAL;}
+<STR>. {adjust();}
 <COMMENT>"*/" {adjust(); BEGIN NORMAL;}
 <COMMENT>. {adjust();}
-. {BEGIN NORMAL; yyless(1);}
+. {BEGIN NORMAL; yyless(0);}
 
