@@ -36,8 +36,6 @@ digit [0-9]
   * and write reguler expressions and actions of your own.
   */ 
   /*
-    " "  {adjust(); continue;} 
-    \n	 {adjust(); EM_newline(); continue;}
     [0-9]+	 {adjust(); yylval.ival=atoi(yytext); return INT;}
   */
 
@@ -84,6 +82,9 @@ digit [0-9]
 <NORMAL>"/" {adjust(); return DIVIDE;}
 <NORMAL>"&" {adjust(); return AND;}
 <NORMAL>"|" {adjust(); return OR;}
+
+<NORMAL>" "|\t {adjust(); continue;} 
+<NORMAL>\n {adjust(); EM_newline(); continue;}
 
 <NORMAL>letter(letter|digit|_)* {adjust(); yylval.sval=yytext; return ID;}
 
