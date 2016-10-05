@@ -25,6 +25,8 @@ void adjust(void)
 %}
 
   /* You can add lex definitions here. */
+letter [a-zA-Z]
+digit [0-9]
 
 %Start NORMAL COMMENT STR
 
@@ -83,6 +85,7 @@ void adjust(void)
 <NORMAL>"&" {adjust(); return AND;}
 <NORMAL>"|" {adjust(); return OR;}
 
+<NORMAL>letter(letter|digit|_)* {adjust(); yylval.sval=yytext; return ID;}
 
 <NORMAL>. {adjust(); EM_error(EM_tokPos, "illegal token");}
 <COMMENT>"*/" {adjust(); BEGIN NORMAL;}
