@@ -18,3 +18,5 @@ util.o: util.c util.h
 
 clean: 
 	rm -f a.out util.o driver.o lex.yy.o lex.yy.c errormsg.o
+handin:
+	tar -czf id.name.tar.gz driver.c errormsg.c errormsg.h gradeMe.sh makefile refs testcases tiger.lex tokens.h util.c util.h
