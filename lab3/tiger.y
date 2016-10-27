@@ -127,7 +127,6 @@ rec: {$$=NULL;}
 
 recs: ID EQ exp {$$=A_EfieldList(A_Efield(S_Symbol($1), $3), NULL);}
     | ID EQ exp COMMA recs {$$=A_EfieldList(A_Efield(S_Symbol($1), $3), $5);}
-
     ;
 
 expseq: {$$=NULL;}
