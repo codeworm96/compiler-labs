@@ -13,8 +13,13 @@
 static struct Ty_ty_ tynil = {Ty_nil};
 Ty_ty Ty_Nil(void) {return &tynil;}
 
-static struct Ty_ty_ tyint = {Ty_int};
-Ty_ty Ty_Int(void) {return &tyint;}
+Ty_ty Ty_Int(int is_loop_var)
+{
+    Ty_ty p = checked_malloc(sizeof(*p));
+    p->kind = Ty_int;
+    p->u.intt.is_loop_var = is_loop_var;
+    return p;
+}
 
 static struct Ty_ty_ tystring = {Ty_string};
 Ty_ty Ty_String(void) {return &tystring;}

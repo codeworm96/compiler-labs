@@ -17,6 +17,7 @@ struct Ty_ty_ {enum {Ty_record, Ty_nil, Ty_int, Ty_string, Ty_array,
 	       union {Ty_fieldList record;
 		      Ty_ty array;
 		      struct {S_symbol sym; Ty_ty ty;} name;
+                      struct {int is_loop_var;} intt;
 		    } u;
 	     };
 
@@ -25,7 +26,7 @@ struct Ty_field_ {S_symbol name; Ty_ty ty;};
 struct Ty_fieldList_ {Ty_field head; Ty_fieldList tail;};
 
 Ty_ty Ty_Nil(void);
-Ty_ty Ty_Int(void);
+Ty_ty Ty_Int(int);
 Ty_ty Ty_String(void);
 Ty_ty Ty_Void(void);
 
