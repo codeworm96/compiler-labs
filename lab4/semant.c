@@ -321,6 +321,28 @@ Ty_fieldList actual_tys(Ty_fieldList l)
     }
 }
 
+int findFunc(A_fundecList fun, S_symbol name)
+{
+    if (!fun) {
+        return 0;
+    } else if (fun->head->name == name) {
+        return 1;
+    } else {
+        return findFunc(fun->tail, name);
+    }
+}
+
+int findNamety(A_nametyList ty, S_symbol name)
+{
+    if (!ty) {
+        return 0;
+    } else if (ty->head->name == name) {
+        return 1;
+    } else {
+        return findNamety(ty->tail, name);
+    }
+}
+
 void transDec(S_table venv, S_table tenv, A_dec d)
 {
     switch (d->kind) {
@@ -356,7 +378,7 @@ void transDec(S_table venv, S_table tenv, A_dec d)
                         resultTy = Ty_Void();
                     }
                     formalTys = makeFormalTyList(d->pos, tenv, fun->head->params);
-                    if (S_look(venv, fun->head->name)) {
+                    if (findFunc(fun->tail, fun->head->name)) {
                         EM_error(d->pos, "two functions have the same name");
                     }
                     S_enter(venv, fun->head->name, E_FunEntry(formalTys, resultTy));
@@ -385,7 +407,7 @@ void transDec(S_table venv, S_table tenv, A_dec d)
                 A_nametyList l;
                 int last, cur;
                 for (l = d->u.type; l; l = l->tail) {
-                    if (S_look(tenv, l->head->name)) {
+                    if (findNamety(l->tail, l->head->name)) {
                         EM_error(d->pos, "two types have the same name");
                     }
                     S_enter(tenv, l->head->name, Ty_Name(l->head->name, NULL));
