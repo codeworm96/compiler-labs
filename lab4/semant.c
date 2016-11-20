@@ -283,7 +283,7 @@ struct expty transVar(S_table venv, S_table tenv, A_var v)
                     return expTy(Ty_Int(0));
                 } else {
                     struct expty exp = transExp(venv, tenv, v->u.subscript.exp);
-                    if (!(exp.ty->kind != Ty_int)) {
+                    if (exp.ty->kind != Ty_int) {
                         EM_error(v->u.subscript.exp->pos, "integer required");
                     }
                     return expTy(var.ty->u.array);
@@ -387,6 +387,7 @@ void transDec(S_table venv, S_table tenv, A_dec d)
                     S_beginScope(venv);
                     f = S_look(venv, fun->head->name);
                     t = f->u.fun.formals;
+                    resultTy = f->u.fun.result;
                     for (l = fun->head->params; l; l = l->tail, t = t->tail) {
                         S_enter(venv, l->head->name, E_VarEntry(t->head));
                     }
