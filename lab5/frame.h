@@ -14,6 +14,7 @@ typedef struct F_access_ *F_access;
 
 typedef struct F_accessList_ *F_accessList;
 struct F_accessList_ { F_access head; F_accessList tail; };
+F_accessList F_AccessList(F_access head, F_accessList tail);
 
 F_frame F_newFrame(Temp_label name, U_boolList formals);
 
