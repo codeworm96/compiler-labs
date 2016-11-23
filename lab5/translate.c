@@ -9,6 +9,19 @@
 #include "frame.h"
 #include "translate.h"
 
+struct Tr_expList_ {
+	Tr_exp head;
+	Tr_expList tail;	
+};
+
+Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail)
+{
+    Tr_expList res = checked_malloc(sizeof(*res));
+    res->head = head;
+    res->tail = tail;
+    return res;
+}
+
 struct Tr_access_ {
 	//Lab5: your code here
 };
@@ -28,6 +41,21 @@ struct Tr_level_ {
 void Tr_procEntryExit(Tr_level level, Tr_exp body, Tr_accessList formals)
 {
     /* TODO */
+}
+
+Tr_level Tr_outermost(void)
+{
+    return NULL;
+}
+
+Tr_level Tr_newLevel(Tr_level parent, Temp_label name, U_boolList formals)
+{
+    return NULL;
+}
+
+Tr_access Tr_allocLocal(Tr_level level, bool escape)
+{
+    return NULL;
 }
 
 static F_fragList fragList;
@@ -178,6 +206,261 @@ Tr_exp Tr_String(string s)
     F_frag frag = F_StringFrag(l, s);
     fragList = F_FragList(frag, fragList);
     return Tr_Ex(T_Name(l));
+}
+
+Tr_exp Tr_OpArithm(A_oper oper, Tr_exp left, Tr_exp right)
+{
+    T_exp l = unEx(left);
+    T_exp r = unEx(right);
+    T_exp res;
+    switch (oper) {
+        case A_plusOp:
+            res = T_Binop(T_plus, l, r);
+            break;
+        case A_minusOp:
+            res = T_Binop(T_minus, l, r);
+            break;
+        case A_timesOp:
+            res = T_Binop(T_mul, l, r);
+            break;
+        case A_divideOp:
+            res = T_Binop(T_div, l, r);
+            break;
+    }
+    return Tr_Ex(res);
+}
+
+Tr_exp Tr_OpCmp(A_oper oper, Tr_exp left, Tr_exp right, int isStr)
+{
+    T_exp l;
+    T_exp r;
+    struct Cx res;
+    if (isStr) {
+        l = F_externalCall("StrCmp", T_ExpList(unEx(left), T_ExpList(unEx(right), NULL)));
+        r = T_Const(0);
+    } else {
+        l = unEx(left);
+        r = unEx(right);
+    }
+    switch (oper) {
+        case A_eqOp:
+            res.stm = T_Cjump(T_eq, l, r, NULL, NULL);
+            break;
+        case A_neqOp:
+            res.stm = T_Cjump(T_ne, l, r, NULL, NULL);
+            break;
+        case A_ltOp:
+            res.stm = T_Cjump(T_lt, l, r, NULL, NULL);
+            break;
+        case A_gtOp:
+            res.stm = T_Cjump(T_gt, l, r, NULL, NULL);
+            break;
+        case A_leOp:
+            res.stm = T_Cjump(T_le, l, r, NULL, NULL);
+            break;
+        case A_geOp:
+            res.stm = T_Cjump(T_ge, l, r, NULL, NULL);
+            break;
+    }
+    res.trues = PatchList(&(res.stm->u.CJUMP.true), NULL);
+    res.falses = PatchList(&(res.stm->u.CJUMP.false), NULL);
+    return Tr_Cx(res.trues, res.falses, res.stm);
+}
+
+Tr_exp Tr_Jump(Temp_label l)
+{
+    return Tr_Nx(T_Jump(T_Name(l), Temp_LabelList(l, NULL)));
+}
+
+Tr_exp Tr_Assign(Tr_exp var, Tr_exp value)
+{
+    return Tr_Nx(T_Move(unEx(var), unEx(value)));
+}
+
+Tr_exp Tr_Seq(Tr_exp seq, Tr_exp e)
+{
+    return Tr_Ex(T_Eseq(unNx(seq), unEx(e)));
+}
+
+Tr_exp Tr_IfThen(Tr_exp test, Tr_exp then)
+{
+    Temp_label t = Temp_newlabel();
+    Temp_label f = Temp_newlabel();
+    struct Cx cx = unCx(test);
+    doPatch(cx.trues, t);
+    doPatch(cx.falses, f);
+    /*
+    cx.stm
+    T_Label(t)
+    unNx(then)
+    T_Label(f)
+    */
+    return Tr_Nx(T_Seq(cx.stm,
+                T_Seq(T_Label(t),
+                    T_Seq(unNx(then),
+                        T_Label(f)))));
+}
+
+Tr_exp Tr_IfThenElse(Tr_exp test, Tr_exp then, Tr_exp elsee)
+{
+    Temp_temp r = Temp_newtemp();
+    Temp_label t = Temp_newlabel();
+    Temp_label f = Temp_newlabel();
+    Temp_label done = Temp_newlabel();
+    struct Cx cx = unCx(test);
+    doPatch(cx.trues, t);
+    doPatch(cx.falses, f);
+    /*
+    cx.stm
+    T_Label(t)
+    T_Move(T_Temp(r), unEx(then))
+    T_Jump(T_Name(done), Temp_LabelList(done, NULL))
+    T_Label(f)
+    T_Move(T_Temp(r), unEx(elsee))
+    T_Jump(T_Name(done), Temp_LabelList(done, NULL))
+    T_Label(done)
+    T_Temp(r)
+    */
+    return Tr_Ex(T_Eseq(cx.stm,
+            T_Eseq(T_Label(t),
+                T_Eseq(T_Move(T_Temp(r), unEx(then)),
+                    T_Eseq(T_Jump(T_Name(done), Temp_LabelList(done, NULL)),
+                        T_Eseq(T_Label(f),
+                            T_Eseq(T_Move(T_Temp(r), unEx(elsee)),
+                                T_Eseq(T_Jump(T_Name(done), Temp_LabelList(done, NULL)),
+                                    T_Eseq(T_Label(done), T_Temp(r))))))))));
+}
+
+Tr_exp Tr_While(Tr_exp test, Tr_exp body, Temp_label done)
+{
+    Temp_label t = Temp_newlabel();
+    Temp_label b = Temp_newlabel();
+    struct Cx cx = unCx(test);
+    doPatch(cx.trues, b);
+    doPatch(cx.falses, done);
+    /*
+    T_Label(t)
+    cx.stm
+    T_Label(b)
+    unNx(body)
+    T_Jump(T_Name(t), Temp_LabelList(t, NULL))
+    T_Label(done)
+    */
+    return Tr_Nx(T_Seq(T_Label(t),
+                T_Seq(cx.stm,
+                    T_Seq(T_Label(b),
+                        T_Seq(unNx(body),
+                            T_Seq(T_Jump(T_Name(t), Temp_LabelList(t, NULL)),
+                                T_Label(done)))))));
+}
+
+Tr_exp Tr_For(Tr_access access, Tr_level level, Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done)
+{
+    Tr_exp i = Tr_simpleVar(access, level);
+    Temp_temp limit = Temp_newtemp();
+    Temp_label b = Temp_newlabel();
+    Temp_label inc = Temp_newlabel();
+    /*
+    T_Move(unEx(i), unEx(lo))
+    T_Move(T_Temp(limit), unEx(hi))
+    T_Cjump(T_gt, unEx(i), T_Temp(limit), done, b)
+    T_Label(b)
+    unNx(body)
+    T_Cjump(T_eq, unEx(i), T_Temp(limit), done, inc)
+    T_Label(inc)
+    T_Move(unEx(i), T_Binop(T_plus, unEx(i), T_Const(1)))
+    T_Jump(T_Name(b), Temp_LabelList(b, NULL))
+    T_Label(done)
+    */
+    return Tr_Nx(T_Seq(T_Move(unEx(i), unEx(lo)),
+                T_Seq(T_Move(T_Temp(limit), unEx(hi)),
+                    T_Seq(T_Cjump(T_gt, unEx(i), T_Temp(limit), done, b),
+                        T_Seq(T_Label(b),
+                            T_Seq(unNx(body),
+                                T_Seq(T_Cjump(T_eq, unEx(i), T_Temp(limit), done, inc),
+                                    T_Seq(T_Label(inc),
+                                        T_Seq(T_Move(unEx(i), T_Binop(T_plus, unEx(i), T_Const(1))),
+                                            T_Seq(T_Jump(T_Name(b), Temp_LabelList(b, NULL)),
+                                                T_Label(done)))))))))));
+}
+
+static T_stm assign_field(Temp_temp r, int num, Tr_expList fields)
+{
+    if (fields) {
+        return T_Seq(T_Move(T_Mem(T_Binop(T_plus, T_Temp(r), T_Const(F_wordSize * num))), unEx(fields->head)),
+                assign_field(r, num - 1, fields->tail));
+    } else {
+        return T_Exp(T_Const(0));
+    }
+}
+
+Tr_exp Tr_Record(int num, Tr_expList fields)
+{
+    Temp_temp r = Temp_newtemp();
+    /*
+    T_Move(T_Temp(r), F_externalCall("Malloc", T_ExpList(T_Const(F_wordSize * num)), NULL))
+    assign_field(r, 0, fields)
+    T_Temp(r)
+    */
+    return Tr_Ex(T_Eseq(T_Move(T_Temp(r), F_externalCall("Malloc", T_ExpList(T_Const(F_wordSize * num), NULL))),
+                T_Eseq(assign_field(r, num - 1, fields),
+                    T_Temp(r))));
+}
+
+Tr_exp Tr_Array(Tr_exp size, Tr_exp init)
+{
+    Temp_temp r = Temp_newtemp();
+    Temp_temp i = Temp_newtemp();
+    Temp_temp limit = Temp_newtemp();
+    Temp_temp v = Temp_newtemp();
+    Temp_label t = Temp_newlabel();
+    Temp_label b = Temp_newlabel();
+    Temp_label done = Temp_newlabel();
+    /*
+    T_Move(T_Temp(limit), unEx(size))
+    T_Move(T_Temp(v), unEx(init))
+    T_Move(T_Temp(r), F_externalCall("Malloc", T_ExpList(T_Binop(T_mul, T_Temp(limit), T_Const(F_wordSize)), NULL)))
+    T_Move(T_Temp(i), T_Const(0))
+    T_Label(t)
+    T_Cjump(T_lt, T_Temp(i), T_Temp(limit), b, done)
+    T_Label(b)
+    T_Move(T_Mem(T_Binop(T_plus, T_Temp(r), T_Binop(T_mul, T_Temp(i), T_Const(F_wordSize)))), T_Temp(v))
+    T_Move(T_Temp(i), T_Binop(T_plus, T_Temp(i), T_Const(1)))
+    T_Jump(T_Name(t), Temp_LabelList(t, NULL))
+    T_Label(done)
+    T_Temp(r)
+    */
+    return Tr_Ex(T_Eseq(T_Move(T_Temp(limit), unEx(size)),
+                T_Eseq(T_Move(T_Temp(v), unEx(init)),
+                        T_Eseq(T_Move(T_Temp(r), F_externalCall("Malloc", T_ExpList(T_Binop(T_mul, T_Temp(limit), T_Const(F_wordSize)), NULL))),
+                            T_Eseq(T_Move(T_Temp(i), T_Const(0)),
+                                T_Eseq(T_Label(t),
+                                    T_Eseq(T_Cjump(T_lt, T_Temp(i), T_Temp(limit), b, done),
+                                        T_Eseq(T_Label(b),
+                                            T_Eseq(T_Move(T_Mem(T_Binop(T_plus, T_Temp(r), T_Binop(T_mul, T_Temp(i), T_Const(F_wordSize)))), T_Temp(v)),
+                                                T_Eseq(T_Move(T_Temp(i), T_Binop(T_plus, T_Temp(i), T_Const(1))),
+                                                    T_Eseq(T_Jump(T_Name(t), Temp_LabelList(t, NULL)),
+                                                        T_Eseq(T_Label(done),
+                                                            T_Temp(r)))))))))))));
+}
+
+Tr_exp Tr_simpleVar(Tr_access access, Tr_level level)
+{
+    return Tr_Nil(); /* TODO */
+}
+
+Tr_exp Tr_fieldVar(Tr_exp addr, int off)
+{
+    return Tr_Ex(T_Mem(T_Binop(T_plus,
+                    unEx(addr),
+                    T_Const(off * F_wordSize))));
+}
+
+Tr_exp Tr_subscriptVar(Tr_exp addr, Tr_exp off)
+{
+    return Tr_Ex(T_Mem(T_Binop(T_plus,
+                    unEx(addr),
+                    T_Binop(T_mul, unEx(off), T_Const(F_wordSize)))));
 }
     
 void Tr_Func(Tr_exp body) /* TODO */

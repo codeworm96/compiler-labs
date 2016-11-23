@@ -10,6 +10,7 @@
 #include "frame.h"
 
 /*Lab5: Your implementation here.*/
+const int F_wordSize = 4;
 
 struct F_frame_ {
 
@@ -39,3 +40,6 @@ F_fragList F_FragList(F_frag head, F_fragList tail) {
     return res;
 }
 
+T_exp F_externalCall(string s, T_expList args) {
+    return T_Call(T_Name(Temp_namedlabel(s)), args);
+}

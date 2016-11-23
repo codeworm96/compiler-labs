@@ -7,6 +7,8 @@
 #include "temp.h"
 #include "tree.h"
 
+extern const int F_wordSize;
+
 typedef struct F_frame_ *F_frame;
 typedef struct F_access_ *F_access;
 
@@ -35,5 +37,6 @@ typedef struct F_fragList_ *F_fragList;
 struct F_fragList_ {F_frag head; F_fragList tail;};
 F_fragList F_FragList(F_frag head, F_fragList tail);
 
+T_exp F_externalCall(string s, T_expList args);
 
 #endif

@@ -2,11 +2,15 @@
 #define TRANSLATE_H
 
 #include "frame.h"
+#include "absyn.h"
 #include "temp.h"
 
 /* Lab5: your code below */
 
 typedef struct Tr_exp_ *Tr_exp;
+
+typedef struct Tr_expList_ *Tr_expList;
+Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail);
 
 typedef struct Tr_access_ *Tr_access;
 
@@ -27,6 +31,21 @@ Tr_exp Tr_Nop();
 Tr_exp Tr_Nil();
 Tr_exp Tr_Int(int v);
 Tr_exp Tr_String(string s);
+Tr_exp Tr_Jump(Temp_label l);
+Tr_exp Tr_OpArithm(A_oper oper, Tr_exp left, Tr_exp right);
+Tr_exp Tr_OpCmp(A_oper oper, Tr_exp left, Tr_exp right, int isStr);
+Tr_exp Tr_Assign(Tr_exp var, Tr_exp value);
+Tr_exp Tr_Seq(Tr_exp seq, Tr_exp e);
+Tr_exp Tr_IfThen(Tr_exp test, Tr_exp then);
+Tr_exp Tr_IfThenElse(Tr_exp test, Tr_exp then, Tr_exp elsee);
+Tr_exp Tr_While(Tr_exp test, Tr_exp body, Temp_label done);
+Tr_exp Tr_For(Tr_access access, Tr_level level, Tr_exp lo, Tr_exp hi, Tr_exp body, Temp_label done);
+Tr_exp Tr_Record(int num, Tr_expList fields);
+Tr_exp Tr_Array(Tr_exp size, Tr_exp init);
+
+Tr_exp Tr_simpleVar(Tr_access access, Tr_level level);
+Tr_exp Tr_fieldVar(Tr_exp addr, int off);
+Tr_exp Tr_subscriptVar(Tr_exp addr, Tr_exp off);
 
 void Tr_Func(Tr_exp body);
 

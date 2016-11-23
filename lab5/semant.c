@@ -17,12 +17,12 @@ struct expty expTy(Tr_exp exp, Ty_ty ty) {
     return e;
 }
 
-struct expty transExp(S_table venv, S_table tenv, A_exp a);
-struct expty transVar(S_table venv, S_table tenv, A_var v);
-void transDec(S_table venv, S_table tenv, A_dec d);
+struct expty transExp(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_exp a);
+struct expty transVar(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_var v);
+Tr_exp transDec(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_dec d);
 
 F_fragList SEM_transProg(A_exp exp){
-    struct expty e = transExp(E_base_venv(), E_base_tenv(), exp);
+    struct expty e = transExp(E_base_venv(), E_base_tenv(), Tr_outermost(), NULL, exp);
     Tr_Func(e.exp);
     return Tr_getResult();
 }
@@ -59,10 +59,10 @@ Ty_ty actual_ty(Ty_ty ty)
     }
 }
 
-struct expty transExp(S_table venv, S_table tenv, A_exp a) {
+struct expty transExp(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_exp a) {
     switch(a->kind) {
         case A_varExp:
-            return transVar(venv, tenv, a->u.var);
+            return transVar(venv, tenv, level, loop, a->u.var);
         case A_nilExp:
             return expTy(Tr_Nil(), Ty_Nil());
         case A_intExp:
@@ -75,12 +75,14 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a) {
                 Ty_tyList formal;
                 struct expty exp;
                 E_enventry x = S_look(venv, a->u.call.func);
+                Tr_expList params = NULL;
                 if (x && x->kind == E_funEntry) {
                     for (arg = a->u.call.args, formal = x->u.fun.formals; arg && formal; arg = arg->tail, formal = formal->tail) {
-                        exp = transExp(venv, tenv, arg->head);
+                        exp = transExp(venv, tenv, level, NULL, arg->head);
                         if (!compatible(formal->head, exp.ty)) {
                             EM_error(arg->head->pos, "para type mismatch");
                         }
+                        params = Tr_ExpList(exp.exp, params);
                     }
                     if (arg) {
                         EM_error(a->pos, "too many params in function %s", S_name(a->u.call.func));
@@ -88,17 +90,17 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a) {
                     if (formal) {
                         EM_error(a->pos, "too less params in function %s", S_name(a->u.call.func));
                     }
-                    return expTy(Tr_Nil(), x->u.fun.result);
+                    return expTy(Tr_Nop(), x->u.fun.result);
                 } else {
                     EM_error(a->pos, "undefined function %s", S_name(a->u.call.func));
-                    return expTy(Tr_Nil(), Ty_Int(0));
+                    return expTy(Tr_Nop(), Ty_Int(0));
                 }
             }
         case A_opExp:
             {
                 A_oper oper = a->u.op.oper;
-                struct expty left = transExp(venv, tenv, a->u.op.left);
-                struct expty right = transExp(venv, tenv, a->u.op.right);
+                struct expty left = transExp(venv, tenv, level, loop, a->u.op.left);
+                struct expty right = transExp(venv, tenv, level, loop, a->u.op.right);
                 if (oper == A_plusOp || oper == A_minusOp || oper == A_timesOp || oper == A_divideOp) {
                     if (left.ty->kind != Ty_int) {
                         EM_error(a->u.op.left->pos, "integer required");
@@ -106,18 +108,18 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a) {
                     if (right.ty->kind != Ty_int) {
                         EM_error(a->u.op.right->pos, "integer required");
                     }
-                    return expTy(Tr_Nil(), Ty_Int(0));
+                    return expTy(Tr_OpArithm(oper, left.exp, right.exp), Ty_Int(0));
                 } else if (oper == A_eqOp || oper == A_neqOp) {
                     if (!compatible(left.ty, right.ty) || left.ty->kind == Ty_void) {
                         EM_error(a->pos, "same type required");
                     }
-                    return expTy(Tr_Nil(), Ty_Int(0));
+                    return expTy(Tr_OpCmp(oper, left.exp, right.exp, left.ty->kind == Ty_string), Ty_Int(0));
                 } else {
                     if (!((left.ty->kind == Ty_int && right.ty->kind == Ty_int) ||
                           (left.ty->kind == Ty_string && right.ty->kind == Ty_string))) {
                         EM_error(a->pos, "same type required");
                     }
-                    return expTy(Tr_Nil(), Ty_Int(0));
+                    return expTy(Tr_OpCmp(oper, left.exp, right.exp, left.ty->kind == Ty_string), Ty_Int(0));
                 }
             }
         case A_recordExp:
@@ -125,79 +127,90 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a) {
                 Ty_ty ty = actual_ty(S_lookType(a->pos, tenv, a->u.record.typ));
                 A_efieldList ef;
                 Ty_fieldList f;
+                Tr_expList fields = NULL;
                 struct expty exp;
+                int num = 0;
                 if (ty->kind != Ty_record) {
                     EM_error(a->pos, "record type required");
-                    return expTy(Tr_Nil(), Ty_Int(0));
+                    return expTy(Tr_Nop(), Ty_Int(0));
                 }
                 for (ef = a->u.record.fields, f = ty->u.record; ef && f; ef = ef->tail, f = f->tail) {
-                    exp = transExp(venv, tenv, ef->head->exp);
+                    exp = transExp(venv, tenv, level, loop, ef->head->exp);
                     if (!(ef->head->name == f->head->name && compatible(f->head->ty, exp.ty))) {
                         EM_error(ef->head->exp->pos, "type mismatch");
                     }
+                    ++num;
+                    fields = Tr_ExpList(exp.exp, fields);
                 }
                 if (f || ef) {
                     EM_error(a->pos, "type mismatch");
                 }
-                return expTy(Tr_Nil(), ty);
+                return expTy(Tr_Record(num, fields), ty);
             }
         case A_seqExp:
             {
                 A_expList cur;
-                struct expty res = expTy(Tr_Nil(), Ty_Void());
+                Ty_ty ty = Ty_Void();
+                Tr_exp exp = Tr_Nop();
+                struct expty res;
                 for (cur = a->u.seq; cur; cur = cur->tail) {
-                    res = transExp(venv, tenv, cur->head);
+                    res = transExp(venv, tenv, level, loop, cur->head);
+                    ty = res.ty;
+                    exp = Tr_Seq(exp, res.exp);
                 }
+                res = expTy(exp, ty);
                 return res;
             }
         case A_assignExp:
             {
-                struct expty v = transVar(venv, tenv, a->u.assign.var);
-                struct expty e = transExp(venv, tenv, a->u.assign.exp);
+                struct expty v = transVar(venv, tenv, level, loop, a->u.assign.var);
+                struct expty e = transExp(venv, tenv, level, loop, a->u.assign.exp);
                 if (v.ty->kind == Ty_int && v.ty->u.intt.is_loop_var) {
                     EM_error(a->pos, "loop variable can't be assigned");
                 }
                 if (!compatible(v.ty, e.ty)) {
                     EM_error(a->pos, "unmatched assign exp");
                 }
-                return expTy(Tr_Nil(), Ty_Void());
+                return expTy(Tr_Assign(v.exp, e.exp), Ty_Void());
             }
         case A_ifExp:
             {
-                struct expty t = transExp(venv, tenv, a->u.iff.test);
+                struct expty t = transExp(venv, tenv, level, loop, a->u.iff.test);
                 if (t.ty->kind != Ty_int) {
                     EM_error(a->u.iff.test->pos, "integer required");
                 }
-                struct expty then = transExp(venv, tenv, a->u.iff.then);
+                struct expty then = transExp(venv, tenv, level, loop, a->u.iff.then);
                 if (a->u.iff.elsee) {
-                    struct expty elsee = transExp(venv, tenv, a->u.iff.elsee);
+                    struct expty elsee = transExp(venv, tenv, level, loop, a->u.iff.elsee);
                     if (!compatible(then.ty, elsee.ty)) {
                         EM_error(a->pos, "then exp and else exp type mismatch");
                     }
-                    return expTy(Tr_Nil(), then.ty);
+                    return expTy(Tr_IfThenElse(t.exp, then.exp, elsee.exp), then.ty);
                 } else {
                     if (then.ty->kind != Ty_void) {
                         EM_error(a->pos, "if-then exp's body must produce no value");
                     }
-                    return expTy(Tr_Nil(), Ty_Void());
+                    return expTy(Tr_IfThen(t.exp, then.exp), Ty_Void());
                 }
             }
         case A_whileExp:
             {
-                struct expty t = transExp(venv, tenv, a->u.whilee.test);
-                struct expty body = transExp(venv, tenv, a->u.whilee.body);
+                Temp_label done = Temp_newlabel();
+                struct expty t = transExp(venv, tenv, level, loop, a->u.whilee.test);
+                struct expty body = transExp(venv, tenv, level, done, a->u.whilee.body);
                 if (t.ty->kind != Ty_int) {
                     EM_error(a->u.whilee.test->pos, "integer required");
                 }
                 if (body.ty->kind != Ty_void) {
                     EM_error(a->u.whilee.body->pos, "while body must produce no value");
                 }
-                return expTy(Tr_Nil(), Ty_Void());
+                return expTy(Tr_While(t.exp, body.exp, done), Ty_Void());
             }
         case A_forExp:
             {
-                struct expty lo = transExp(venv, tenv, a->u.forr.lo);
-                struct expty hi = transExp(venv, tenv, a->u.forr.hi);
+                Temp_label done = Temp_newlabel();
+                struct expty lo = transExp(venv, tenv, level, loop, a->u.forr.lo);
+                struct expty hi = transExp(venv, tenv, level, loop, a->u.forr.hi);
                 struct expty body;
                 if (lo.ty->kind != Ty_int) {
                     EM_error(a->u.forr.lo->pos, "for exp's range type is not integer");
@@ -206,26 +219,36 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a) {
                     EM_error(a->u.forr.hi->pos, "for exp's range type is not integer");
                 }
                 S_beginScope(venv);
-                S_enter(venv, a->u.forr.var, E_VarEntry(Ty_Int(1)));
-                body = transExp(venv, tenv, a->u.forr.body);
+                Tr_access access = Tr_allocLocal(level, a->u.forr.escape);
+                S_enter(venv, a->u.forr.var, E_VarEntry(access, Ty_Int(1)));
+                body = transExp(venv, tenv, level, done, a->u.forr.body);
                 if (body.ty->kind != Ty_void) {
                     EM_error(a->u.forr.body->pos, "while body must produce no value");
                 }
                 S_endScope(venv);
-                return expTy(Tr_Nil(), Ty_Void());
+                return expTy(Tr_For(access, level, lo.exp, hi.exp, body.exp, done), Ty_Void());
             }
         case A_breakExp:
-            return expTy(Tr_Nil(), Ty_Void()); /* TODO: break must within while / for */
+            {
+                if (loop == NULL) {
+                    EM_error(a->pos, "break is not inside a loop");
+                    return expTy(Tr_Nop(), Ty_Void());
+                } else {
+                    return expTy(Tr_Jump(loop), Ty_Void());
+                }
+            }
         case A_letExp:
             {
                 struct expty exp;
+                Tr_exp e = Tr_Nop();
                 A_decList d;
                 S_beginScope(venv);
                 S_beginScope(tenv);
                 for (d = a->u.let.decs; d; d = d->tail) {
-                    transDec(venv, tenv, d->head);
+                    e = Tr_Seq(e, transDec(venv, tenv, level, loop, d->head));
                 }
-                exp = transExp(venv, tenv, a->u.let.body);
+                exp = transExp(venv, tenv, level, loop, a->u.let.body);
+                exp.exp = Tr_Seq(e, exp.exp);
                 S_endScope(tenv);
                 S_endScope(venv);
                 return exp;
@@ -233,32 +256,31 @@ struct expty transExp(S_table venv, S_table tenv, A_exp a) {
         case A_arrayExp:
             {
                 Ty_ty ty = actual_ty(S_lookType(a->pos, tenv, a->u.array.typ));
-                struct expty size = transExp(venv, tenv, a->u.array.size);
-                struct expty init = transExp(venv, tenv, a->u.array.init);
+                struct expty size = transExp(venv, tenv, level, loop, a->u.array.size);
+                struct expty init = transExp(venv, tenv, level, loop, a->u.array.init);
                 if (ty->kind != Ty_array) {
                     EM_error(a->pos, "array type required");
-                    return expTy(Tr_Nil(), Ty_Int(0));
+                    return expTy(Tr_Nop(), Ty_Int(0));
                 }
                 if (size.ty->kind != Ty_int) {
-                    printf("%d\n", size.ty->kind);
                     EM_error(a->u.array.size->pos, "integer required");
                 }
                 if (!compatible(ty->u.array, init.ty)) {
                     EM_error(a->u.array.init->pos, "type mismatch");
                 }
-                return expTy(Tr_Nil(), ty);
+                return expTy(Tr_Array(size.exp, init.exp), ty);
             }
     }
 }
 
-struct expty transVar(S_table venv, S_table tenv, A_var v) /* TODO */
+struct expty transVar(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_var v)
 {
     switch(v->kind) {
         case A_simpleVar:
             {
                 E_enventry x = S_look(venv, v->u.simple);
                 if (x && x->kind == E_varEntry) {
-                    return expTy(Tr_Nil(), x->u.var.ty);
+                    return expTy(Tr_simpleVar(x->u.var.access, level), x->u.var.ty);
                 } else {
                     EM_error(v->pos, "undefined variable %s", S_name(v->u.simple));
                     return expTy(Tr_Nop(), Ty_Int(0));
@@ -266,15 +288,17 @@ struct expty transVar(S_table venv, S_table tenv, A_var v) /* TODO */
             }
         case A_fieldVar:
             {
-                struct expty var = transVar(venv, tenv, v->u.field.var);
+                struct expty var = transVar(venv, tenv, level, loop, v->u.field.var);
                 if (!(var.ty->kind == Ty_record)) {
                     EM_error(v->u.field.var->pos, "not a record type");
                     return expTy(Tr_Nop(), Ty_Int(0));
                 } else {
+                    int ix = 0;
                     for (Ty_fieldList field = var.ty->u.record; field; field = field->tail) {
                         if (field->head->name == v->u.field.sym) {
-                            return expTy(Tr_Nil(), field->head->ty);
+                            return expTy(Tr_fieldVar(var.exp, ix), field->head->ty);
                         }
+                        ++ix;
                     }
                     EM_error(v->u.field.var->pos, "field %s doesn't exist", S_name(v->u.field.sym));
                     return expTy(Tr_Nop(), Ty_Int(0));
@@ -282,16 +306,16 @@ struct expty transVar(S_table venv, S_table tenv, A_var v) /* TODO */
             }
         case A_subscriptVar:
             {
-                struct expty var = transVar(venv, tenv, v->u.subscript.var);
+                struct expty var = transVar(venv, tenv, level, loop, v->u.subscript.var);
                 if (!(var.ty->kind == Ty_array)) {
                     EM_error(v->u.subscript.var->pos, "array type required");
                     return expTy(Tr_Nop(), Ty_Int(0));
                 } else {
-                    struct expty exp = transExp(venv, tenv, v->u.subscript.exp);
+                    struct expty exp = transExp(venv, tenv, level, loop, v->u.subscript.exp);
                     if (exp.ty->kind != Ty_int) {
                         EM_error(v->u.subscript.exp->pos, "integer required");
                     }
-                    return expTy(Tr_Nil(), var.ty->u.array);
+                    return expTy(Tr_subscriptVar(var.exp, exp.exp), var.ty->u.array);
                 }
             }
         default:
@@ -303,6 +327,15 @@ Ty_tyList makeFormalTyList(A_pos pos, S_table tenv, A_fieldList l)
 {
     if (l) {
         return Ty_TyList(actual_ty(S_lookType(pos, tenv, l->head->typ)), makeFormalTyList(pos, tenv, l->tail));
+    } else {
+        return NULL;
+    }
+}
+
+U_boolList makeFormalBoolList(A_fieldList l)
+{
+    if (l) {
+        return U_BoolList(l->head->escape, makeFormalBoolList(l->tail));
     } else {
         return NULL;
     }
@@ -348,24 +381,26 @@ int findNamety(A_nametyList ty, S_symbol name)
     }
 }
 
-void transDec(S_table venv, S_table tenv, A_dec d) /* TODO */
+Tr_exp transDec(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_dec d)
 {
     switch (d->kind) {
         case A_varDec:
             {
-                struct expty e = transExp(venv, tenv, d->u.var.init);
+                struct expty e = transExp(venv, tenv, level, loop, d->u.var.init);
+                Tr_access access = Tr_allocLocal(level, d->u.var.escape);
                 if (d->u.var.typ) {
                     Ty_ty spec = actual_ty(S_lookType(d->pos, tenv, d->u.var.typ));
                     if (!compatible(spec, e.ty)) {
                         EM_error(d->pos, "type mismatch");
                     }
-                    S_enter(venv, d->u.var.var, E_VarEntry(spec));
+                    S_enter(venv, d->u.var.var, E_VarEntry(access, spec));
                 } else {
                     if (e.ty->kind == Ty_nil) {
                         EM_error(d->pos, "init should not be nil without type specified");
                     }
-                    S_enter(venv, d->u.var.var, E_VarEntry(e.ty));
+                    S_enter(venv, d->u.var.var, E_VarEntry(access, e.ty));
                 }
+                return Tr_Assign(Tr_simpleVar(access, level), e.exp);
                 break;
             }
         case A_functionDec:
@@ -374,6 +409,7 @@ void transDec(S_table venv, S_table tenv, A_dec d) /* TODO */
                 A_fieldList l;
                 Ty_ty resultTy;
                 Ty_tyList formalTys, t;
+                U_boolList formalBools;
                 E_enventry f;
                 struct expty exp;
                 for (fun = d->u.function; fun; fun = fun->tail) {
@@ -386,17 +422,18 @@ void transDec(S_table venv, S_table tenv, A_dec d) /* TODO */
                     if (findFunc(fun->tail, fun->head->name)) {
                         EM_error(d->pos, "two functions have the same name");
                     }
-                    S_enter(venv, fun->head->name, E_FunEntry(formalTys, resultTy));
+                    formalBools = makeFormalBoolList(fun->head->params);
+                    S_enter(venv, fun->head->name, E_FunEntry(Tr_newLevel(level, Temp_newlabel(), formalBools), Temp_newlabel(), formalTys, resultTy));
                 }
                 for (fun = d->u.function; fun; fun = fun->tail) {
                     S_beginScope(venv);
                     f = S_look(venv, fun->head->name);
                     t = f->u.fun.formals;
                     for (l = fun->head->params; l; l = l->tail, t = t->tail) {
-                        S_enter(venv, l->head->name, E_VarEntry(t->head));
+                        S_enter(venv, l->head->name, E_VarEntry(Tr_allocLocal(f->u.fun.level, l->head->escape), t->head));
                     }
                     resultTy = f->u.fun.result;
-                    exp = transExp(venv, tenv, fun->head->body);
+                    exp = transExp(venv, tenv, f->u.fun.level, NULL, fun->head->body);
                     if (!compatible(exp.ty, resultTy)) {
                         if (resultTy->kind == Ty_void) {
                             EM_error(fun->head->body->pos, "procedure returns value");
@@ -407,6 +444,7 @@ void transDec(S_table venv, S_table tenv, A_dec d) /* TODO */
                     S_endScope(venv);
                     Tr_Func(exp.exp);
                 }
+                return Tr_Nop();
                 break;
             }
         case A_typeDec:
@@ -488,6 +526,7 @@ void transDec(S_table venv, S_table tenv, A_dec d) /* TODO */
                             }
                     }
                 }
+                return Tr_Nop();
                 break;
             }
     }
