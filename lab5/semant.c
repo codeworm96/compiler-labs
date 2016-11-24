@@ -22,8 +22,9 @@ struct expty transVar(S_table venv, S_table tenv, Tr_level level, Temp_label loo
 Tr_exp transDec(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_dec d);
 
 F_fragList SEM_transProg(A_exp exp){
-    struct expty e = transExp(E_base_venv(), E_base_tenv(), Tr_outermost(), NULL, exp);
-    Tr_Func(e.exp);
+    Tr_level main = Tr_outermost();
+    struct expty e = transExp(E_base_venv(), E_base_tenv(), main, NULL, exp);
+    Tr_Func(e.exp, main);
     return Tr_getResult();
 }
 
@@ -90,7 +91,7 @@ struct expty transExp(S_table venv, S_table tenv, Tr_level level, Temp_label loo
                     if (formal) {
                         EM_error(a->pos, "too less params in function %s", S_name(a->u.call.func));
                     }
-                    return expTy(Tr_Nop(), x->u.fun.result);
+                    return expTy(Tr_Call(x->u.fun.level, x->u.fun.label, params, level), x->u.fun.result);
                 } else {
                     EM_error(a->pos, "undefined function %s", S_name(a->u.call.func));
                     return expTy(Tr_Nop(), Ty_Int(0));
@@ -412,6 +413,7 @@ Tr_exp transDec(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_d
                 U_boolList formalBools;
                 E_enventry f;
                 struct expty exp;
+                Tr_accessList params;
                 for (fun = d->u.function; fun; fun = fun->tail) {
                     if (fun->head->result) {
                         resultTy = S_lookType(d->pos, tenv, fun->head->result);
@@ -429,8 +431,9 @@ Tr_exp transDec(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_d
                     S_beginScope(venv);
                     f = S_look(venv, fun->head->name);
                     t = f->u.fun.formals;
-                    for (l = fun->head->params; l; l = l->tail, t = t->tail) {
-                        S_enter(venv, l->head->name, E_VarEntry(Tr_allocLocal(f->u.fun.level, l->head->escape), t->head));
+                    params = Tr_formals(f->u.fun.level);
+                    for (l = fun->head->params; l; l = l->tail, t = t->tail, params = params->tail) {
+                        S_enter(venv, l->head->name, E_VarEntry(params->head, t->head));
                     }
                     resultTy = f->u.fun.result;
                     exp = transExp(venv, tenv, f->u.fun.level, NULL, fun->head->body);
@@ -442,7 +445,7 @@ Tr_exp transDec(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_d
                         }
                     }
                     S_endScope(venv);
-                    Tr_Func(exp.exp);
+                    Tr_Func(exp.exp, f->u.fun.level);
                 }
                 return Tr_Nop();
                 break;

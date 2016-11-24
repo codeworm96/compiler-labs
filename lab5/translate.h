@@ -15,6 +15,11 @@ Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail);
 typedef struct Tr_access_ *Tr_access;
 
 typedef struct Tr_accessList_ *Tr_accessList;
+struct Tr_accessList_ {
+	Tr_access head;
+	Tr_accessList tail;	
+};
+
 Tr_accessList Tr_AccessList(Tr_access head, Tr_accessList tail);
 
 typedef struct Tr_level_ *Tr_level;
@@ -32,6 +37,7 @@ Tr_exp Tr_Nil();
 Tr_exp Tr_Int(int v);
 Tr_exp Tr_String(string s);
 Tr_exp Tr_Jump(Temp_label l);
+Tr_exp Tr_Call(Tr_level level, Temp_label label, Tr_expList params, Tr_level cur);
 Tr_exp Tr_OpArithm(A_oper oper, Tr_exp left, Tr_exp right);
 Tr_exp Tr_OpCmp(A_oper oper, Tr_exp left, Tr_exp right, int isStr);
 Tr_exp Tr_Assign(Tr_exp var, Tr_exp value);
@@ -47,6 +53,6 @@ Tr_exp Tr_simpleVar(Tr_access access, Tr_level level);
 Tr_exp Tr_fieldVar(Tr_exp addr, int off);
 Tr_exp Tr_subscriptVar(Tr_exp addr, Tr_exp off);
 
-void Tr_Func(Tr_exp body);
+void Tr_Func(Tr_exp body, Tr_level level);
 
 #endif

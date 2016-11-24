@@ -12,6 +12,11 @@
 /*Lab5: Your implementation here.*/
 const int F_wordSize = 4;
 
+Temp_temp F_FP(void)
+{
+    return Temp_newtemp(); /* TODO: ebp */
+}
+
 struct F_frame_ {
     Temp_label name;
     F_accessList formals;
@@ -65,7 +70,7 @@ F_frame F_newFrame(Temp_label name, U_boolList formals) {
     f->local_cnt = 0;
 }
 
-F_accessList F_foramls(F_frame f)
+F_accessList F_formals(F_frame f)
 {
     return f->formals;
 }
@@ -82,6 +87,15 @@ F_access F_allocLocal(F_frame f, bool escape)
         return InFrame(-F_wordSize * f->local_cnt);
     } else {
         return InReg(Temp_newtemp());
+    }
+}
+
+T_exp F_Exp(F_access access, T_exp fp)
+{
+    if (access->kind == inFrame) {
+        return T_Mem(T_Binop(T_plus, fp, T_Const(access->u.offs)));
+    } else {
+        return T_Temp(access->u.reg);
     }
 }
 

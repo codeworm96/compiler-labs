@@ -23,19 +23,30 @@ Tr_expList Tr_ExpList(Tr_exp head, Tr_expList tail)
 }
 
 struct Tr_access_ {
-	//Lab5: your code here
+    Tr_level level;
+    F_access access;
 };
 
+Tr_access Tr_Access(Tr_level level, F_access access)
+{
+    Tr_access res = checked_malloc(sizeof(*res));
+    res->level = level;
+    res->access = access;
+    return res;
+}
 
-struct Tr_accessList_ {
-	Tr_access head;
-	Tr_accessList tail;	
-};
-
-
+Tr_accessList Tr_AccessList(Tr_access head, Tr_accessList tail)
+{
+    Tr_accessList res = checked_malloc(sizeof(*res));
+    res->head = head;
+    res->tail = tail;
+    return res;
+}
 
 struct Tr_level_ {
-	//Lab5: your code here
+    Tr_level parent;
+    F_frame frame;
+    Tr_accessList formals;
 };
 
 void Tr_procEntryExit(Tr_level level, Tr_exp body, Tr_accessList formals)
@@ -43,19 +54,46 @@ void Tr_procEntryExit(Tr_level level, Tr_exp body, Tr_accessList formals)
     /* TODO */
 }
 
+static Tr_level outermost = NULL;
 Tr_level Tr_outermost(void)
 {
-    return NULL;
+    if (outermost) {
+        return outermost;
+    } else {
+        outermost = checked_malloc(sizeof(*outermost));
+        outermost->parent = NULL;
+        outermost->frame = F_newFrame(Temp_newlabel(), NULL);
+        outermost->formals = NULL;
+        return outermost;
+    }
+}
+
+Tr_accessList makeLevelFormals(Tr_level level, F_accessList l)
+{
+    if (l) {
+        return Tr_AccessList(Tr_Access(level, l->head), makeLevelFormals(level, l->tail));
+    } else {
+        return NULL;
+    }
 }
 
 Tr_level Tr_newLevel(Tr_level parent, Temp_label name, U_boolList formals)
 {
-    return NULL;
+    Tr_level res = checked_malloc(sizeof(*res));
+    res->parent = parent;
+    res->frame = F_newFrame(name, U_BoolList(1, formals));
+    res->formals = makeLevelFormals(res, F_formals(res->frame)->tail); /* discard static link */
+    return res;
+}
+
+Tr_accessList Tr_formals(Tr_level level)
+{
+    return level->formals;
 }
 
 Tr_access Tr_allocLocal(Tr_level level, bool escape)
 {
-    return NULL;
+    return Tr_Access(level, F_allocLocal(level->frame, escape));
 }
 
 static F_fragList fragList;
@@ -185,6 +223,17 @@ static struct Cx unCx(Tr_exp e) {
     assert(0); /* can't get here */
 }
 
+static T_exp staticLink(Tr_level now, Tr_level target)
+{
+    T_exp res = T_Temp(F_FP());
+    Tr_level cur = now;
+    while (cur && cur != target) {
+        res = F_Exp(F_formals(cur->frame)->head, res);
+        cur = cur->parent;
+    }
+    return res;
+}
+
 Tr_exp Tr_Nop()
 {
     return Tr_Ex(T_Const(0));
@@ -206,6 +255,22 @@ Tr_exp Tr_String(string s)
     F_frag frag = F_StringFrag(l, s);
     fragList = F_FragList(frag, fragList);
     return Tr_Ex(T_Name(l));
+}
+
+T_expList makeCallParams(Tr_expList params)
+{
+    T_expList res = NULL;
+    Tr_expList cur = params;
+    while (cur) {
+        res = T_ExpList(unEx(cur->head), res);
+        cur = cur->tail;
+    }
+    return res;
+}
+
+Tr_exp Tr_Call(Tr_level level, Temp_label label, Tr_expList params, Tr_level cur)
+{
+    return Tr_Ex(T_Call(T_Name(label), T_ExpList(staticLink(cur, level->parent), makeCallParams(params))));
 }
 
 Tr_exp Tr_OpArithm(A_oper oper, Tr_exp left, Tr_exp right)
@@ -446,7 +511,8 @@ Tr_exp Tr_Array(Tr_exp size, Tr_exp init)
 
 Tr_exp Tr_simpleVar(Tr_access access, Tr_level level)
 {
-    return Tr_Nil(); /* TODO */
+    T_exp fp = staticLink(level, access->level);
+    return Tr_Ex(F_Exp(access->access, fp));
 }
 
 Tr_exp Tr_fieldVar(Tr_exp addr, int off)
@@ -463,7 +529,7 @@ Tr_exp Tr_subscriptVar(Tr_exp addr, Tr_exp off)
                     T_Binop(T_mul, unEx(off), T_Const(F_wordSize)))));
 }
     
-void Tr_Func(Tr_exp body) /* TODO */
+void Tr_Func(Tr_exp body, Tr_level level) /* TODO */
 {
     F_frag frag = F_ProcFrag(NULL, NULL);
     fragList = F_FragList(frag, fragList);

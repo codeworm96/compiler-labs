@@ -35,16 +35,18 @@ S_table E_base_tenv(void)
 
 S_table E_base_venv(void) /* TODO */
 {
+    Temp_label stub = Temp_newlabel();
+    Tr_level stub_level = Tr_newLevel(Tr_outermost(), stub, U_BoolList(1, NULL));
     S_table res = S_empty();
-    S_enter(res, S_Symbol("print"), E_FunEntry(NULL, NULL, Ty_TyList(Ty_String(), NULL), Ty_Void()));
-    S_enter(res, S_Symbol("flush"), E_FunEntry(NULL, NULL, NULL, Ty_Void()));
-    S_enter(res, S_Symbol("getchar"), E_FunEntry(NULL, NULL, NULL, Ty_String()));
-    S_enter(res, S_Symbol("ord"), E_FunEntry(NULL, NULL, Ty_TyList(Ty_String(), NULL), Ty_Int(0)));
-    S_enter(res, S_Symbol("chr"), E_FunEntry(NULL, NULL, Ty_TyList(Ty_Int(0), NULL), Ty_String()));
-    S_enter(res, S_Symbol("size"), E_FunEntry(NULL, NULL, Ty_TyList(Ty_String(), NULL), Ty_Int(0)));
-    S_enter(res, S_Symbol("substring"), E_FunEntry(NULL, NULL, Ty_TyList(Ty_String(), Ty_TyList(Ty_Int(0), Ty_TyList(Ty_Int(0), NULL))), Ty_String()));
-    S_enter(res, S_Symbol("concat"), E_FunEntry(NULL, NULL, Ty_TyList(Ty_String(), Ty_TyList(Ty_String(), NULL)), Ty_String()));
-    S_enter(res, S_Symbol("not"), E_FunEntry(NULL, NULL, Ty_TyList(Ty_Int(0), NULL), Ty_Int(0)));
-    S_enter(res, S_Symbol("exit"), E_FunEntry(NULL, NULL, Ty_TyList(Ty_Int(0), NULL), Ty_Void()));
+    S_enter(res, S_Symbol("print"), E_FunEntry(stub_level, stub, Ty_TyList(Ty_String(), NULL), Ty_Void()));
+    S_enter(res, S_Symbol("flush"), E_FunEntry(stub_level, stub, NULL, Ty_Void()));
+    S_enter(res, S_Symbol("getchar"), E_FunEntry(stub_level, stub, NULL, Ty_String()));
+    S_enter(res, S_Symbol("ord"), E_FunEntry(stub_level, stub, Ty_TyList(Ty_String(), NULL), Ty_Int(0)));
+    S_enter(res, S_Symbol("chr"), E_FunEntry(stub_level, stub, Ty_TyList(Ty_Int(0), NULL), Ty_String()));
+    S_enter(res, S_Symbol("size"), E_FunEntry(stub_level, stub, Ty_TyList(Ty_String(), NULL), Ty_Int(0)));
+    S_enter(res, S_Symbol("substring"), E_FunEntry(stub_level, stub, Ty_TyList(Ty_String(), Ty_TyList(Ty_Int(0), Ty_TyList(Ty_Int(0), NULL))), Ty_String()));
+    S_enter(res, S_Symbol("concat"), E_FunEntry(stub_level, stub, Ty_TyList(Ty_String(), Ty_TyList(Ty_String(), NULL)), Ty_String()));
+    S_enter(res, S_Symbol("not"), E_FunEntry(stub_level, stub, Ty_TyList(Ty_Int(0), NULL), Ty_Int(0)));
+    S_enter(res, S_Symbol("exit"), E_FunEntry(stub_level, stub, Ty_TyList(Ty_Int(0), NULL), Ty_Void()));
     return res;
 }
