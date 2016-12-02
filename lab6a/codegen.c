@@ -39,6 +39,90 @@ static Temp_temp munchExp(T_exp e);
 
 static void munchStm(T_stm s)
 {
+    if (s->kind == T_MOVE && s->u.MOVE.dst->kind == T_TEMP && s->u.MOVE.src->kind == T_TEMP) {
+        Temp_temp src = s->u.MOVE.src->u.TEMP;
+        Temp_temp dst = s->u.MOVE.dst->u.TEMP;
+        emit(AS_Move("movl `s0, `d0\n", L(dst, NULL), L(src, NULL)));
+        return;
+    }
+    if (s->kind == T_MOVE && s->u.MOVE.dst->kind == T_TEMP) {
+        Temp_temp src = munchExp(s->u.MOVE.src);
+        Temp_temp dst = s->u.MOVE.dst->u.TEMP;
+        emit(AS_Move("movl `s0, `d0\n", L(dst, NULL), L(src, NULL)));
+        return;
+    }
+    if (s->kind == T_MOVE && s->u.MOVE.dst->kind == T_MEM) {
+        Temp_temp src = munchExp(s->u.MOVE.src);
+        Temp_temp dst = munchExp(s->u.MOVE.dst->u.MEM);
+        emit(AS_Oper("movl `s0, (`s1)\n", NULL, L(src, L(dst, NULL)), NULL));
+        return;
+    }
+    if (s->kind == T_JUMP && s->u.JUMP.exp->kind == T_NAME) {
+        Temp_label l = s->u.JUMP.exp->u.NAME;
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        sprintf(a, "jmp %s\n", Temp_labelstring(l));
+        emit(AS_Oper(a, NULL, NULL, AS_Targets(s->u.JUMP.jumps)));
+        return;
+    }
+    if (s->kind == T_JUMP) {
+        Temp_temp t = munchExp(s->u.JUMP.exp);
+        emit(AS_Oper("jmp *`s0\n", NULL, L(t, NULL), AS_Targets(s->u.JUMP.jumps)));
+        return;
+    }
+    if (s->kind == T_CJUMP && s->u.CJUMP.op == T_eq) {
+        Temp_temp l = munchExp(s->u.CJUMP.left);
+        Temp_temp r = munchExp(s->u.CJUMP.right);
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        emit(AS_Oper("cmp `s0, `s1\n", NULL, L(r, L(l, NULL)), NULL));
+        sprintf(a, "je %s\n", Temp_labelstring(s->u.CJUMP.true));
+        emit(AS_Oper(a, NULL, NULL, AS_Targets(Temp_LabelList(s->u.CJUMP.true, NULL))));
+        return;
+    }
+    if (s->kind == T_CJUMP && s->u.CJUMP.op == T_ne) {
+        Temp_temp l = munchExp(s->u.CJUMP.left);
+        Temp_temp r = munchExp(s->u.CJUMP.right);
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        emit(AS_Oper("cmp `s0, `s1\n", NULL, L(r, L(l, NULL)), NULL));
+        sprintf(a, "jne %s\n", Temp_labelstring(s->u.CJUMP.true));
+        emit(AS_Oper(a, NULL, NULL, AS_Targets(Temp_LabelList(s->u.CJUMP.true, NULL))));
+        return;
+    }
+    if (s->kind == T_CJUMP && s->u.CJUMP.op == T_lt) {
+        Temp_temp l = munchExp(s->u.CJUMP.left);
+        Temp_temp r = munchExp(s->u.CJUMP.right);
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        emit(AS_Oper("cmp `s0, `s1\n", NULL, L(r, L(l, NULL)), NULL));
+        sprintf(a, "jl %s\n", Temp_labelstring(s->u.CJUMP.true));
+        emit(AS_Oper(a, NULL, NULL, AS_Targets(Temp_LabelList(s->u.CJUMP.true, NULL))));
+        return;
+    }
+    if (s->kind == T_CJUMP && s->u.CJUMP.op == T_gt) {
+        Temp_temp l = munchExp(s->u.CJUMP.left);
+        Temp_temp r = munchExp(s->u.CJUMP.right);
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        emit(AS_Oper("cmp `s0, `s1\n", NULL, L(r, L(l, NULL)), NULL));
+        sprintf(a, "jg %s\n", Temp_labelstring(s->u.CJUMP.true));
+        emit(AS_Oper(a, NULL, NULL, AS_Targets(Temp_LabelList(s->u.CJUMP.true, NULL))));
+        return;
+    }
+    if (s->kind == T_CJUMP && s->u.CJUMP.op == T_le) {
+        Temp_temp l = munchExp(s->u.CJUMP.left);
+        Temp_temp r = munchExp(s->u.CJUMP.right);
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        emit(AS_Oper("cmp `s0, `s1\n", NULL, L(r, L(l, NULL)), NULL));
+        sprintf(a, "jle %s\n", Temp_labelstring(s->u.CJUMP.true));
+        emit(AS_Oper(a, NULL, NULL, AS_Targets(Temp_LabelList(s->u.CJUMP.true, NULL))));
+        return;
+    }
+    if (s->kind == T_CJUMP && s->u.CJUMP.op == T_ge) {
+        Temp_temp l = munchExp(s->u.CJUMP.left);
+        Temp_temp r = munchExp(s->u.CJUMP.right);
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        emit(AS_Oper("cmp `s0, `s1\n", NULL, L(r, L(l, NULL)), NULL));
+        sprintf(a, "jge %s\n", Temp_labelstring(s->u.CJUMP.true));
+        emit(AS_Oper(a, NULL, NULL, AS_Targets(Temp_LabelList(s->u.CJUMP.true, NULL))));
+        return;
+    }
     if (s->kind == T_LABEL) {
         char *a = checked_malloc(MAXLINE * sizeof(char));
         sprintf(a, "%s:\n", Temp_labelstring(s->u.LABEL));
@@ -54,7 +138,6 @@ static void munchStm(T_stm s)
         munchExp(s->u.EXP);
         return;
     }
-    emit(AS_Oper("mov", NULL, NULL, NULL));
 }
 
 static void pushArgs(T_expList l)
@@ -87,7 +170,42 @@ static Temp_temp munchExp(T_exp e)
         emit(AS_Oper("call *`s0\n", L(r, NULL), L(s, NULL), NULL));
         return r;
     }
-    /* TODO: Binop */
+    if (e->kind == T_BINOP && e->u.BINOP.op == T_plus) {
+        Temp_temp a = munchExp(e->u.BINOP.left);
+        Temp_temp b = munchExp(e->u.BINOP.right);
+        Temp_temp r = Temp_newtemp();
+        emit(AS_Move("movl `s0, `d0\n", L(r, NULL), L(a, NULL)));
+        emit(AS_Oper("addl `s0, `d0\n", L(r, NULL), L(b, NULL), NULL));
+        return r;
+    }
+    if (e->kind == T_BINOP && e->u.BINOP.op == T_minus) {
+        Temp_temp a = munchExp(e->u.BINOP.left);
+        Temp_temp b = munchExp(e->u.BINOP.right);
+        Temp_temp r = Temp_newtemp();
+        emit(AS_Move("movl `s0, `d0\n", L(r, NULL), L(a, NULL)));
+        emit(AS_Oper("subl `s0, `d0\n", L(r, NULL), L(b, NULL), NULL));
+        return r;
+    }
+    if (e->kind == T_BINOP && e->u.BINOP.op == T_mul) {
+        Temp_temp a = munchExp(e->u.BINOP.left);
+        Temp_temp b = munchExp(e->u.BINOP.right);
+        Temp_temp r = Temp_newtemp();
+        emit(AS_Move("movl `s0, `d0\n", L(r, NULL), L(a, NULL)));
+        emit(AS_Oper("imul `s0, `d0\n", L(r, NULL), L(b, NULL), NULL));
+        return r;
+    }
+    if (e->kind == T_BINOP && e->u.BINOP.op == T_div) {
+        Temp_temp a = munchExp(e->u.BINOP.left);
+        Temp_temp b = munchExp(e->u.BINOP.right);
+        Temp_temp edx = Temp_newtemp(); /* TODO: edx */
+        Temp_temp eax = Temp_newtemp(); /* TODO: eax */
+        Temp_temp r = Temp_newtemp();
+        emit(AS_Move("movl `s0, `d0\n", L(eax, NULL), L(a, NULL)));
+        emit(AS_Oper("cltd\n", NULL, NULL, NULL));
+        emit(AS_Oper("idivl `s0\n", NULL, L(b, NULL), NULL));
+        emit(AS_Move("movl `s0, `d0\n", L(r, NULL), L(eax, NULL)));
+        return r;
+    }
     if (e->kind == T_CONST) {
         char *a = checked_malloc(MAXLINE * sizeof(char));
         Temp_temp r = Temp_newtemp();
@@ -115,7 +233,7 @@ static Temp_temp munchExp(T_exp e)
     if (e->kind == T_TEMP) {
         return e->u.TEMP;
     }
-    return Temp_newtemp();
+    assert(0); /* control flow should never reach here */
 }
 
 AS_instrList F_codegen(F_frame f, T_stmList stmList) {
