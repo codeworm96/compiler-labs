@@ -21,12 +21,26 @@ int *allocRecord(int size)
 
 struct string {int length; unsigned char chars[1];};
 
-int stringEqual(struct string *s, struct string *t)
-{int i;
- if (s==t) return 1;
- if (s->length!=t->length) return 0;
- for(i=0;i<s->length;i++) if (s->chars[i]!=t->chars[i]) return 0;
- return 1;
+int StrCmp(struct string *s, struct string *t)
+{
+    int i = 0;
+    int j = 0;
+    while (i < s->length && j < t->length) {
+        if (s->chars[i] < t->chars[j]) {
+            return -1;
+        } else if (s->chars[i] > t->chars[j]) {
+            return 1;
+        }
+        ++i;
+        ++j;
+    }
+    if (i < s->length) {
+        return 1;
+    } else if (j < t->length) {
+        return -1;
+    } else {
+        return 0;
+    }
 }
 
 void print(struct string *s)

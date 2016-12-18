@@ -6,6 +6,7 @@
 #ifndef TEMP_H
 #define TEMP_H
 
+struct Temp_temp_ {int num;};
 typedef struct Temp_temp_ *Temp_temp;
 Temp_temp Temp_newtemp(void);
 
@@ -21,6 +22,12 @@ string Temp_labelstring(Temp_label s);
 typedef struct Temp_labelList_ *Temp_labelList;
 struct Temp_labelList_ { Temp_label head; Temp_labelList tail;};
 Temp_labelList Temp_LabelList(Temp_label h, Temp_labelList t);
+bool Temp_inTempList(Temp_temp t, Temp_tempList l);
+Temp_tempList Temp_SubTempList(Temp_tempList l, Temp_tempList r);
+Temp_tempList Temp_UnionTempList(Temp_tempList l, Temp_tempList r);
+bool Temp_TempListEqual(Temp_tempList l, Temp_tempList r);
+Temp_tempList Temp_replaceTempList(Temp_tempList l, Temp_temp old, Temp_temp new);
+void Temp_DumpTempList(Temp_tempList l);
 
 typedef struct Temp_map_ *Temp_map;
 Temp_map Temp_empty(void);

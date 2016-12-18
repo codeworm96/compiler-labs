@@ -41,10 +41,19 @@ static void doProc(FILE *out, F_frame frame, T_stm body)
 
  struct RA_result ra = RA_regAlloc(frame, iList);  /* 10, 11 */
 
- fprintf(out, "BEGIN function\n");
- AS_printInstrList (out, iList,
+
+ fprintf(out, ".text\n");
+ fprintf(out, ".global %s\n", Temp_labelstring(F_name(frame)));
+ fprintf(out, ".type %s, @function\n", Temp_labelstring(F_name(frame)));
+ fprintf(out, "%s:\n", Temp_labelstring(F_name(frame)));
+ fprintf(out, "pushl %%ebp\n");
+ fprintf(out, "movl %%esp, %%ebp\n");
+ fprintf(out, "subl $%d, %%esp\n", F_size(frame));
+ AS_printInstrList (out, ra.il,
                        Temp_layerMap(F_tempMap,ra.coloring));
- fprintf(out, "END function\n\n");
+ fprintf(out, "leave\n");
+ fprintf(out, "ret\n");
+ fprintf(out, ".size %s, .-%s\n", Temp_labelstring(F_name(frame)), Temp_labelstring(F_name(frame)));
 }
 
 int main(int argc, string *argv)
@@ -77,8 +86,9 @@ int main(int argc, string *argv)
    for (;frags;frags=frags->tail)
      if (frags->head->kind == F_procFrag) 
        doProc(out, frags->head->u.proc.frame, frags->head->u.proc.body);
-     else if (frags->head->kind == F_stringFrag) 
-       fprintf(out, "%s\n", frags->head->u.stringg.str);
+     else if (frags->head->kind == F_stringFrag) {
+       F_DumpString(out, frags->head);
+     }
 
    fclose(out);
    return 0;

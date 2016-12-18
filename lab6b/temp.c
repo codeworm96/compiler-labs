@@ -13,7 +13,7 @@
 #include "temp.h"
 #include "table.h"
 
-struct Temp_temp_ {int num;};
+//struct Temp_temp_ {int num;};
 
 string Temp_labelstring(Temp_label s)
 {return S_name(s);
@@ -90,6 +90,78 @@ Temp_tempList Temp_TempList(Temp_temp h, Temp_tempList t)
 {Temp_tempList p = (Temp_tempList) checked_malloc(sizeof (*p));
  p->head=h; p->tail=t;
  return p;
+}
+
+bool Temp_inTempList(Temp_temp t, Temp_tempList l)
+{
+    Temp_tempList p = l;
+    for (; p; p = p->tail) {
+        if (p->head == t) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+Temp_tempList Temp_SubTempList(Temp_tempList l, Temp_tempList r)
+{
+    Temp_tempList res = NULL;
+    Temp_tempList p = l;
+    for (; p; p = p->tail) {
+        if (!Temp_inTempList(p->head, r)) {
+            res = Temp_TempList(p->head, res);
+        }
+    }
+    return res;
+}
+
+Temp_tempList Temp_UnionTempList(Temp_tempList l, Temp_tempList r)
+{
+    Temp_tempList res = r;
+    Temp_tempList p = l;
+    for (; p; p = p->tail) {
+        if (!Temp_inTempList(p->head, r)) {
+            res = Temp_TempList(p->head, res);
+        }
+    }
+    return res;
+}
+
+bool Temp_TempListEqual(Temp_tempList l, Temp_tempList r)
+{
+    Temp_tempList p = l;
+    for (; p; p = p->tail) {
+        if (!Temp_inTempList(p->head, r)) {
+            return FALSE;
+        }
+    }
+    p = r;
+    for (; p; p = p->tail) {
+        if (!Temp_inTempList(p->head, l)) {
+            return FALSE;
+        }
+    }
+    return TRUE;
+}
+
+Temp_tempList Temp_replaceTempList(Temp_tempList l, Temp_temp old, Temp_temp new)
+{
+    if (l) {
+        if (l->head == old) {
+            return Temp_TempList(new, Temp_replaceTempList(l->tail, old, new));
+        } else {
+            return Temp_TempList(l->head, Temp_replaceTempList(l->tail, old, new));
+        }
+    } else {
+        return NULL;
+    }
+}
+
+void Temp_DumpTempList(Temp_tempList l)
+{
+    for (; l; l = l->tail) {
+        printf(" %d", l->head->num);
+    }
 }
 
 Temp_labelList Temp_LabelList(Temp_label h, Temp_labelList t)
