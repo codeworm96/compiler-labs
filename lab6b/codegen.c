@@ -39,6 +39,60 @@ static Temp_temp munchExp(T_exp e);
 
 static void munchStm(T_stm s)
 {
+    if (s->kind == T_MOVE && s->u.MOVE.dst->kind == T_TEMP &&
+            s->u.MOVE.src->kind == T_MEM &&
+            s->u.MOVE.src->u.MEM->kind == T_BINOP &&
+            s->u.MOVE.src->u.MEM->u.BINOP.op == T_plus &&
+            s->u.MOVE.src->u.MEM->u.BINOP.right->kind == T_CONST &&
+            s->u.MOVE.src->u.MEM->u.BINOP.left->kind == T_TEMP) {
+        Temp_temp dst = s->u.MOVE.dst->u.TEMP;
+        Temp_temp r = s->u.MOVE.src->u.MEM->u.BINOP.left->u.TEMP;
+        int off = s->u.MOVE.src->u.MEM->u.BINOP.right->u.CONST;
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        sprintf(a, "movl %d(`s0), `d0\n", off);
+        emit(AS_Oper(a, L(dst, NULL), L(r, NULL), AS_Targets(NULL)));
+        return;
+    }
+    if (s->kind == T_MOVE && s->u.MOVE.dst->kind == T_TEMP &&
+            s->u.MOVE.src->kind == T_MEM &&
+            s->u.MOVE.src->u.MEM->kind == T_BINOP &&
+            s->u.MOVE.src->u.MEM->u.BINOP.op == T_plus &&
+            s->u.MOVE.src->u.MEM->u.BINOP.left->kind == T_CONST &&
+            s->u.MOVE.src->u.MEM->u.BINOP.right->kind == T_TEMP) {
+        Temp_temp dst = s->u.MOVE.dst->u.TEMP;
+        Temp_temp r = s->u.MOVE.src->u.MEM->u.BINOP.right->u.TEMP;
+        int off = s->u.MOVE.src->u.MEM->u.BINOP.left->u.CONST;
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        sprintf(a, "movl %d(`s0), `d0\n", off);
+        emit(AS_Oper(a, L(dst, NULL), L(r, NULL), AS_Targets(NULL)));
+        return;
+    }
+    if (s->kind == T_MOVE && s->u.MOVE.dst->kind == T_MEM &&
+            s->u.MOVE.dst->u.MEM->kind == T_BINOP &&
+            s->u.MOVE.dst->u.MEM->u.BINOP.op == T_plus &&
+            s->u.MOVE.dst->u.MEM->u.BINOP.right->kind == T_CONST &&
+            s->u.MOVE.dst->u.MEM->u.BINOP.left->kind == T_TEMP) {
+        Temp_temp src = munchExp(s->u.MOVE.src);
+        Temp_temp r = s->u.MOVE.dst->u.MEM->u.BINOP.left->u.TEMP;
+        int off = s->u.MOVE.dst->u.MEM->u.BINOP.right->u.CONST;
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        sprintf(a, "movl `s0, %d(`s1)\n", off);
+        emit(AS_Oper(a, NULL, L(src, L(r, NULL)), AS_Targets(NULL)));
+        return;
+    }
+    if (s->kind == T_MOVE && s->u.MOVE.dst->kind == T_MEM &&
+            s->u.MOVE.dst->u.MEM->kind == T_BINOP &&
+            s->u.MOVE.dst->u.MEM->u.BINOP.op == T_plus &&
+            s->u.MOVE.dst->u.MEM->u.BINOP.left->kind == T_CONST &&
+            s->u.MOVE.dst->u.MEM->u.BINOP.right->kind == T_TEMP) {
+        Temp_temp src = munchExp(s->u.MOVE.src);
+        Temp_temp r = s->u.MOVE.dst->u.MEM->u.BINOP.right->u.TEMP;
+        int off = s->u.MOVE.dst->u.MEM->u.BINOP.left->u.CONST;
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        sprintf(a, "movl `s0, %d(`s1)\n", off);
+        emit(AS_Oper(a, NULL, L(src, L(r, NULL)), AS_Targets(NULL)));
+        return;
+    }
     if (s->kind == T_MOVE && s->u.MOVE.dst->kind == T_TEMP && s->u.MOVE.src->kind == T_TEMP) {
         Temp_temp src = s->u.MOVE.src->u.TEMP;
         Temp_temp dst = s->u.MOVE.dst->u.TEMP;
@@ -152,6 +206,30 @@ static void pushArgs(T_expList l)
 
 static Temp_temp munchExp(T_exp e)
 {
+    if (e->kind == T_MEM && e->u.MEM->kind == T_BINOP &&
+            e->u.MEM->u.BINOP.op == T_plus &&
+            e->u.MEM->u.BINOP.right->kind == T_CONST &&
+            e->u.MEM->u.BINOP.left->kind == T_TEMP) {
+        Temp_temp r = Temp_newtemp();
+        Temp_temp s = e->u.MEM->u.BINOP.left->u.TEMP;
+        int c = e->u.MEM->u.BINOP.right->u.CONST;
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        sprintf(a, "movl %d(`s0), `d0\n", c);
+        emit(AS_Oper(a, L(r, NULL), L(s, NULL), AS_Targets(NULL)));
+        return r;
+    }
+    if (e->kind == T_MEM && e->u.MEM->kind == T_BINOP &&
+            e->u.MEM->u.BINOP.op == T_plus &&
+            e->u.MEM->u.BINOP.left->kind == T_CONST &&
+            e->u.MEM->u.BINOP.right->kind == T_TEMP) {
+        Temp_temp r = Temp_newtemp();
+        Temp_temp s = e->u.MEM->u.BINOP.right->u.TEMP;
+        int c = e->u.MEM->u.BINOP.left->u.CONST;
+        char *a = checked_malloc(MAXLINE * sizeof(char));
+        sprintf(a, "movl %d(`s0), `d0\n", c);
+        emit(AS_Oper(a, L(r, NULL), L(s, NULL), AS_Targets(NULL)));
+        return r;
+    }
     if (e->kind == T_CALL && e->u.CALL.fun->kind == T_NAME) {
         Temp_temp rv = F_RV();
         Temp_temp r = Temp_newtemp();
