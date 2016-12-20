@@ -50,8 +50,6 @@ struct F_frag_ {enum {F_stringFrag, F_procFrag} kind;
 F_frag F_StringFrag(Temp_label label, string str);
 F_frag F_ProcFrag(T_stm body, F_frame frame);
 
-void F_DumpString(FILE *out, F_frag s);
-
 typedef struct F_fragList_ *F_fragList;
 struct F_fragList_ {F_frag head; F_fragList tail;};
 F_fragList F_FragList(F_frag head, F_fragList tail);

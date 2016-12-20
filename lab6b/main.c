@@ -3,6 +3,8 @@
  */
 
 #include <stdio.h>
+#include <string.h>
+#include <ctype.h>
 #include "util.h"
 #include "symbol.h"
 #include "types.h"
@@ -24,6 +26,33 @@
 #include "regalloc.h"
 
 extern bool anyErrors;
+
+static void doString(FILE *out, F_frag s)
+{
+    string str = s->u.stringg.str;
+    assert(s->kind == F_stringFrag);
+    fprintf(out, ".section .rodata\n");
+    fprintf(out, "%s:\n", Temp_labelstring(s->u.stringg.label));
+    fprintf(out, ".int %d\n", strlen(str));
+    fprintf(out, ".ascii \"");
+    for (; *str != 0; ++str) {
+        if (*str == '\n') {
+            fprintf(out, "\\n");
+        } else if (*str == '\t') {
+            fprintf(out, "\\t");
+        } else if (*str == '\\') {
+            fprintf(out, "\\\\");
+        } else if (*str == '\"') {
+            fprintf(out, "\\\"");
+        } else if (isprint(*str)) {
+            fprintf(out, "%c", *str);
+        } else {
+            fprintf(out, "\%d%d%d", *str / 64 % 8, *str / 8 % 8, *str % 8); 
+        }
+    }
+    fprintf(out, "\"\n");
+}
+
 
 /* print the assembly language instructions to filename.s */
 static void doProc(FILE *out, F_frame frame, T_stm body)
@@ -87,7 +116,7 @@ int main(int argc, string *argv)
      if (frags->head->kind == F_procFrag) 
        doProc(out, frags->head->u.proc.frame, frags->head->u.proc.body);
      else if (frags->head->kind == F_stringFrag) {
-       F_DumpString(out, frags->head);
+       doString(out, frags->head);
      }
 
    fclose(out);

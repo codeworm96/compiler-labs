@@ -185,24 +185,6 @@ F_frag F_StringFrag(Temp_label label, string str) {
     return res;
 }
 
-void F_DumpString(FILE *out, F_frag s)
-{
-    string str = s->u.stringg.str;
-    assert(s->kind == F_stringFrag);
-    fprintf(out, ".section .rodata\n");
-    fprintf(out, "%s:\n", Temp_labelstring(s->u.stringg.label));
-    fprintf(out, ".int %d\n", strlen(str));
-    fprintf(out, ".ascii \"");
-    for (; *str != 0; ++str) {
-        if (*str == '\n') {
-            fprintf(out, "\\n");
-        } else {
-            fprintf(out, "%c", *str);
-        }
-    }
-    fprintf(out, "\"\n");
-}
-
 F_frag F_ProcFrag(T_stm body, F_frame frame) {
     F_frag res = checked_malloc(sizeof(*res));
     res->kind = F_procFrag;
