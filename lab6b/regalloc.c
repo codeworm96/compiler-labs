@@ -20,6 +20,7 @@ static char *reg_names[7] = {"undef", "%eax", "%ebx", "%ecx", "%edx", "%esi", "%
 
 static G_table degree;
 static G_table color;
+static G_table alias;
 static G_nodeList spillWorklist;
 static G_nodeList simplifyWorklist;
 static G_nodeList selectStack;
@@ -29,6 +30,7 @@ static void build(struct Live_graph g)
 {
     degree = G_empty();
     color = G_empty();
+    alias = G_empty();
     G_nodeList p = G_nodes(g.graph);
     for (; p != NULL; p = p->tail) {
         int * t = checked_malloc(sizeof(int));
@@ -56,10 +58,23 @@ static void build(struct Live_graph g)
             *c = 0;
         }
         G_enter(color, p->head, c);
+
+        G_node * a = checked_malloc(sizeof(G_node));
+        *a = p->head;
+        G_enter(alias, p->head, a);
     }
     spillWorklist = NULL;
     simplifyWorklist = NULL;
     selectStack = NULL;
+}
+
+static G_node GetAlias(G_node n)
+{
+    G_node * a = G_look(alias, n);
+    if (*a != n) {
+        *a = GetAlias(*a);
+    }
+    return *a;
 }
 
 static void makeWorklist(struct Live_graph g)
@@ -112,7 +127,7 @@ static void selectSpill()
     spillWorklist = spillWorklist->tail;
 }
 
-static void assignColors()
+static void assignColors(struct Live_graph g)
 {
     bool used[K+1];
     int i;
@@ -120,13 +135,13 @@ static void assignColors()
     while (selectStack) {
         G_node cur = selectStack->head;
         selectStack = selectStack->tail;
-        printf("coloring %d %d\n", Live_gtemp(cur)->num, G_degree(cur));
+        /* printf("coloring %d %d\n", Live_gtemp(cur)->num, G_degree(cur)); */
         for (i = 1; i <= K; ++i) {
             used[i] = FALSE;
         }
         for (G_nodeList p = G_succ(cur); p; p = p->tail) {
-            int *t = G_look(color, p->head);
-            printf("color of %d is %d\n", Live_gtemp(p->head)->num, *t);
+            int *t = G_look(color, GetAlias(p->head));
+            /* printf("color of %d is %d\n", Live_gtemp(p->head)->num, *t); */
             used[*t] = TRUE;
         }
         for (i = 1; i <= K; ++i) {
@@ -141,6 +156,11 @@ static void assignColors()
             int *c = G_look(color, cur);
             *c = i;
         }
+    }
+    for (G_nodeList p = G_nodes(g.graph); p != NULL; p = p->tail) {
+        int *c0 = G_look(color, GetAlias(p->head));
+        int *c = G_look(color, p->head);
+        *c = *c0;
     }
 }
 
@@ -253,7 +273,7 @@ struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
                 selectSpill();
             }
         }
-        assignColors();
+        assignColors(live_graph);
         if (spillNodes) {
             rewriteProgram(f, &il);
         } else {
