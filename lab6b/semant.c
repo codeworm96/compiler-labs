@@ -79,7 +79,7 @@ struct expty transExp(S_table venv, S_table tenv, Tr_level level, Temp_label loo
                 Tr_expList params = NULL;
                 if (x && x->kind == E_funEntry) {
                     for (arg = a->u.call.args, formal = x->u.fun.formals; arg && formal; arg = arg->tail, formal = formal->tail) {
-                        exp = transExp(venv, tenv, level, NULL, arg->head);
+                        exp = transExp(venv, tenv, level, loop, arg->head);
                         if (!compatible(formal->head, exp.ty)) {
                             EM_error(arg->head->pos, "para type mismatch");
                         }
@@ -430,8 +430,8 @@ Tr_exp transDec(S_table venv, S_table tenv, Tr_level level, Temp_label loop, A_d
                     S_enter(venv, fun->head->name, E_FunEntry(Tr_newLevel(level, fun_name, formalBools), fun_name, formalTys, resultTy));
                 }
                 for (fun = d->u.function; fun; fun = fun->tail) {
-                    S_beginScope(venv);
                     f = S_look(venv, fun->head->name);
+                    S_beginScope(venv);
                     t = f->u.fun.formals;
                     params = Tr_formals(f->u.fun.level);
                     for (l = fun->head->params; l; l = l->tail, t = t->tail, params = params->tail) {

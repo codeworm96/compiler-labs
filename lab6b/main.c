@@ -20,7 +20,7 @@
 #include "canon.h"
 #include "prabsyn.h"
 #include "printtree.h"
-//#include "escape.h" /* needed by escape analysis */
+#include "escape.h" /* needed by escape analysis */
 #include "parse.h"
 #include "codegen.h"
 #include "regalloc.h"
@@ -102,8 +102,8 @@ int main(int argc, string *argv)
    pr_exp(out, absyn_root, 0); /* print absyn data structure */
    fprintf(out, "\n");
 #endif
-	//If you have implemented escape analysis, uncomment this
-   //Esc_findEscape(absyn_root); /* set varDec's escape field */
+   //If you have implemented escape analysis, uncomment this
+   Esc_findEscape(absyn_root); /* set varDec's escape field */
 
    frags = SEM_transProg(absyn_root);
    if (anyErrors) return 1; /* don't continue */
