@@ -27,6 +27,21 @@ struct G_node_ {
   void *info;
 };
 
+int G_NodeCount(G_graph g)
+{
+    return g->nodecount;
+}
+
+int G_NodeKey(G_node node)
+{
+    return node->mykey;
+}
+
+bool * G_adjSet(bool * set, int cnt, int i, int j)
+{
+    return set + (j + cnt * i);
+}
+
 G_graph G_Graph(void)
 {G_graph g = (G_graph) checked_malloc(sizeof *g);
  g->nodecount = 0;

@@ -11,6 +11,26 @@
 #include "liveness.h"
 #include "table.h"
 
+static int sqr(int x)
+{
+    return x * x;
+}
+
+/* machine registers */
+static Temp_tempList machine_regs = NULL;
+Temp_tempList MachineRegs()
+{
+    if (!machine_regs) {
+        machine_regs = Temp_TempList(F_eax(),
+                       Temp_TempList(F_ebx(),
+                       Temp_TempList(F_ecx(),
+                       Temp_TempList(F_edx(),
+                       Temp_TempList(F_esi(),
+                       Temp_TempList(F_edi(), NULL))))));
+    }
+    return machine_regs;
+}
+
 Live_moveList Live_MoveList(G_node src, G_node dst, Live_moveList tail) {
 	Live_moveList lm = (Live_moveList) checked_malloc(sizeof(*lm));
 	lm->src = src;
@@ -34,21 +54,25 @@ static G_node get_node(G_graph g, Temp_temp temp, TAB_table temp2node)
     return res;
 }
 
-static void link(G_graph g, Temp_temp temp_a, Temp_temp temp_b, TAB_table temp2node)
+static void link(struct Live_graph *g, Temp_temp temp_a, Temp_temp temp_b, TAB_table temp2node)
 {
     if (temp_a == temp_b || temp_a == F_FP() || temp_b == F_FP()) return; /* exclude ebp */
 
-    G_node a = get_node(g, temp_a, temp2node);
-    G_node b = get_node(g, temp_b, temp2node);
-    if (!G_inNodeList(a, G_adj(b))) {
+    G_node a = get_node(g->graph, temp_a, temp2node);
+    G_node b = get_node(g->graph, temp_b, temp2node);
+    bool * cell = G_adjSet(g->adj, G_NodeCount(g->graph), G_NodeKey(a), G_NodeKey(b));
+    if (!*cell) {
         printf("link %d-%d\n", temp_a->num, temp_b->num);
-        G_addEdge(a, b);
-        G_addEdge(b, a);
+
+        *cell = TRUE;
+        if (!Temp_inTempList(temp_a, MachineRegs()))
+            G_addEdge(a, b);
+        if (!Temp_inTempList(temp_b, MachineRegs()))
+            G_addEdge(b, a);
     }
 }
 
 struct Live_graph Live_liveness(G_graph flow) {
-    Temp_tempList machine_regs;
     struct Live_graph res;
     G_table in = G_empty();
     G_table out = G_empty();
@@ -86,41 +110,46 @@ struct Live_graph Live_liveness(G_graph flow) {
     res.moves = NULL; // TODO
     res.graph = G_Graph();
 
-    /* machine registers */
-    machine_regs = Temp_TempList(F_eax(),
-                   Temp_TempList(F_ebx(),
-                   Temp_TempList(F_ecx(),
-                   Temp_TempList(F_edx(),
-                   Temp_TempList(F_esi(),
-                   Temp_TempList(F_edi(), NULL))))));
-    for (Temp_tempList m1 = machine_regs; m1; m1 = m1->tail) {
-        for (Temp_tempList m2 = machine_regs; m2; m2 = m2->tail) {
+
+    /* create nodes */
+    for (Temp_tempList m = MachineRegs(); m; m = m->tail) {
+        get_node(res.graph, m->head, temp2node);
+    }
+    for (p = G_nodes(flow); p != NULL; p = p->tail) {
+        for (Temp_tempList def = FG_def(p->head); def; def = def->tail) {
+            if (def->head != F_FP()) {
+                get_node(res.graph, def->head, temp2node);
+            }
+        }
+    }
+    res.adj = checked_malloc(sqr(G_NodeCount(res.graph)) * sizeof(bool));
+
+    /* link nodes */
+    for (Temp_tempList m1 = MachineRegs(); m1; m1 = m1->tail) {
+        for (Temp_tempList m2 = MachineRegs(); m2; m2 = m2->tail) {
             if (m1->head != m2->head) {
-                link(res.graph, m1->head, m2->head, temp2node);
+                link(&res, m1->head, m2->head, temp2node);
             }
         }
     }
 
-    p = G_nodes(flow);
-    for (; p != NULL; p = p->tail) {
+    for (p = G_nodes(flow); p != NULL; p = p->tail) {
         Temp_tempList outp = *(Temp_tempList*)G_look(out, p->head), op;
         Temp_tempList def = FG_def(p->head);
+        /*
         AS_instr inst = G_nodeInfo(p->head);
         printf("%s:", inst->u.MOVE.assem);
         Temp_DumpTempList(outp);
         printf("\n");
+        */
 
-        for (; def; def = def->tail) {
-            if (def->head != F_FP()) {
-                get_node(res.graph, def->head, temp2node); /* define a reg */
-                for (op = outp; op; op = op->tail) {
-                    link(res.graph, def->head, op->head, temp2node);
-                }
+        for (Temp_tempList def = FG_def(p->head); def; def = def->tail) {
+            for (op = outp; op; op = op->tail) {
+                link(&res, def->head, op->head, temp2node);
             }
         }
     }
 
     return res;
 }
-
 

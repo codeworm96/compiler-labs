@@ -8,6 +8,10 @@ typedef struct G_node_ *G_node;    /* The "node" type */
 typedef struct G_nodeList_ *G_nodeList;
 struct G_nodeList_ { G_node head; G_nodeList tail;};
 
+int G_NodeCount(G_graph g);
+int G_NodeKey(G_node node);
+bool * G_adjSet(bool * set, int cnt, int i, int j);
+
 /* Make a new graph */
 G_graph G_Graph(void); 
 /* Make a new node in graph "g", with associated "info" */
