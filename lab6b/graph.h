@@ -21,6 +21,7 @@ G_node G_Node(G_graph g, void *info);
 G_nodeList G_NodeList(G_node head, G_nodeList tail);
 
 G_nodeList G_SubNodeList(G_nodeList l, G_nodeList r);
+G_nodeList G_UnionNodeList(G_nodeList l, G_nodeList r);
 
 /* Get the list of nodes belonging to "g" */
 G_nodeList G_nodes(G_graph g);

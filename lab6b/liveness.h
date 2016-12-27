@@ -4,6 +4,9 @@ struct Live_moveList_ {
 	Live_moveList tail;
 };
 
+bool Live_inMoveList(G_node src, G_node dst, Live_moveList l);
+Live_moveList Live_UnionMoveList(Live_moveList l, Live_moveList r);
+Live_moveList Live_SubMoveList(Live_moveList l, Live_moveList r);
 Live_moveList Live_MoveList(G_node src, G_node dst, Live_moveList tail);
 
 struct Live_graph {

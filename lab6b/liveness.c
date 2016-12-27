@@ -31,12 +31,48 @@ Temp_tempList MachineRegs()
     return machine_regs;
 }
 
+bool Live_inMoveList(G_node src, G_node dst, Live_moveList l)
+{
+    for (Live_moveList p = l; p; p = p->tail) {
+        if (p->src == src && p->dst == dst) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+Live_moveList Live_UnionMoveList(Live_moveList l, Live_moveList r)
+{
+    Live_moveList res = r;
+    for (Live_moveList p = l; p; p = p->tail) {
+        if (!Live_inMoveList(p->src, p->dst, r)) {
+            res = Live_MoveList(p->src, p->dst, res);
+        }
+    }
+    return res;
+}
+
+Live_moveList Live_SubMoveList(Live_moveList l, Live_moveList r)
+{
+    Live_moveList res = NULL;
+    for (Live_moveList p = l; p; p = p->tail) {
+        if (!Live_inMoveList(p->src, p->dst, r)) {
+            res = Live_MoveList(p->src, p->dst, res);
+        }
+    }
+    return res;
+}
+
 Live_moveList Live_MoveList(G_node src, G_node dst, Live_moveList tail) {
+    if (!Live_inMoveList(src, dst, tail)) {
 	Live_moveList lm = (Live_moveList) checked_malloc(sizeof(*lm));
 	lm->src = src;
 	lm->dst = dst;
 	lm->tail = tail;
 	return lm;
+    } else {
+        return tail;
+    }
 }
 
 
@@ -135,7 +171,18 @@ struct Live_graph Live_liveness(G_graph flow) {
 
     for (p = G_nodes(flow); p != NULL; p = p->tail) {
         Temp_tempList outp = *(Temp_tempList*)G_look(out, p->head), op;
-        Temp_tempList def = FG_def(p->head);
+        AS_instr inst = G_nodeInfo(p->head);
+        if (inst->kind == I_MOVE) {
+            printf("move\n");
+            outp = Temp_SubTempList(outp, FG_use(p->head));
+            for (Temp_tempList def = FG_def(p->head); def; def = def->tail) {
+                for (Temp_tempList use = FG_use(p->head); use; use = use->tail) {
+                    res.moves = Live_MoveList(get_node(res.graph, use->head, temp2node),
+                            get_node(res.graph, def->head, temp2node),
+                            res.moves);
+                }
+            }
+        }
         /*
         AS_instr inst = G_nodeInfo(p->head);
         printf("%s:", inst->u.MOVE.assem);

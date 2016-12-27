@@ -69,6 +69,18 @@ G_nodeList G_SubNodeList(G_nodeList l, G_nodeList r)
     return res;
 }
 
+G_nodeList G_UnionNodeList(G_nodeList l, G_nodeList r)
+{
+    G_nodeList res = r;
+    G_nodeList p = l;
+    for (; p != NULL; p = p->tail) {
+        if (!G_inNodeList(p->head, r)) {
+            res = G_NodeList(p->head, res);
+        }
+    }
+    return res;
+}
+
 /* generic creation of G_node */
 G_node G_Node(G_graph g, void *info)
 {G_node n = (G_node)checked_malloc(sizeof *n);
