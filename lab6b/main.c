@@ -34,7 +34,7 @@ static void doString(FILE *out, F_frag s)
     fprintf(out, ".section .rodata\n");
     fprintf(out, "%s:\n", Temp_labelstring(s->u.stringg.label));
     fprintf(out, ".int %d\n", strlen(str));
-    fprintf(out, ".ascii \"");
+    fprintf(out, ".string \"");
     for (; *str != 0; ++str) {
         if (*str == '\n') {
             fprintf(out, "\\n");
@@ -52,7 +52,6 @@ static void doString(FILE *out, F_frag s)
     }
     fprintf(out, "\"\n");
 }
-
 
 /* print the assembly language instructions to filename.s */
 static void doProc(FILE *out, F_frame frame, T_stm body)

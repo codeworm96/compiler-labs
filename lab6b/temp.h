@@ -6,7 +6,7 @@
 #ifndef TEMP_H
 #define TEMP_H
 
-struct Temp_temp_ {int num;};
+struct Temp_temp_ {int num; bool spilled; };
 typedef struct Temp_temp_ *Temp_temp;
 Temp_temp Temp_newtemp(void);
 

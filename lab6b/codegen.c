@@ -319,9 +319,18 @@ static Temp_temp munchExp(T_exp e)
 AS_instrList F_codegen(F_frame f, T_stmList stmList) {
     AS_instrList list;
     T_stmList sl;
+    Temp_temp bak_ebx = Temp_newtemp();
+    Temp_temp bak_esi = Temp_newtemp();
+    Temp_temp bak_edi = Temp_newtemp();
+    emit(AS_Move("movl `s0, `d0\n", L(bak_ebx, NULL), L(F_ebx(), NULL)));
+    emit(AS_Move("movl `s0, `d0\n", L(bak_esi, NULL), L(F_esi(), NULL)));
+    emit(AS_Move("movl `s0, `d0\n", L(bak_edi, NULL), L(F_edi(), NULL)));
     for (sl = stmList; sl; sl = sl->tail) {
         munchStm(sl->head);
     }
+    emit(AS_Move("movl `s0, `d0\n", L(F_edi(), NULL), L(bak_edi, NULL)));
+    emit(AS_Move("movl `s0, `d0\n", L(F_esi(), NULL), L(bak_esi, NULL)));
+    emit(AS_Move("movl `s0, `d0\n", L(F_ebx(), NULL), L(bak_ebx, NULL)));
     emit(AS_Oper("", NULL, L(F_RV(), L(F_ebx(), L(F_esi(), L(F_edi(), NULL)))), AS_Targets(NULL)));
     list = iList;
     iList = NULL;

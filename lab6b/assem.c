@@ -134,9 +134,15 @@ void AS_print(FILE *out, AS_instr i, Temp_map m)
     /* i->u.LABEL->label); */
     break;
   case I_MOVE:
-    format(r, i->u.MOVE.assem, i->u.MOVE.dst, i->u.MOVE.src, NULL, m);
-    fprintf(out, "%s", r);
-    break;
+    {
+        string d = Temp_look(m, i->u.MOVE.dst->head);
+        string s = Temp_look(m, i->u.MOVE.src->head);
+        if (!(strcmp(d, s) == 0 && i->u.MOVE.dst->tail == NULL && i->u.MOVE.src->tail == NULL)) {
+            format(r, i->u.MOVE.assem, i->u.MOVE.dst, i->u.MOVE.src, NULL, m);
+            fprintf(out, "%s", r);
+        }
+        break;
+    }
   }
 }
 

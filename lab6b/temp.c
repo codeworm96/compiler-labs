@@ -36,6 +36,7 @@ static int temps = 100;
 
 Temp_temp Temp_newtemp(void)
 {Temp_temp p = (Temp_temp) checked_malloc(sizeof (*p));
+ p->spilled = FALSE;
  p->num=temps++;
  {char r[16];
   sprintf(r, "%d", p->num);

@@ -23,6 +23,7 @@ static G_graph graph;
 static G_table degree;
 static G_table color;
 static G_table alias;
+static G_table rank;
 static G_nodeList spillWorklist;
 static G_nodeList simplifyWorklist;
 static G_nodeList selectStack;
@@ -46,7 +47,7 @@ static void build(struct Live_graph g)
         int * t = checked_malloc(sizeof(int));
         *t = 0;
         for (G_nodeList cur = G_succ(p->head); cur; cur = cur->tail) {
-            *t++;
+            ++(*t);
         }
         G_enter(degree, p->head, t);
 
@@ -75,6 +76,7 @@ static void build(struct Live_graph g)
     }
     graph = g.graph;
     adjSet = g.adj;
+    rank = g.rank;
     spillWorklist = NULL;
     simplifyWorklist = NULL;
     freezeWorklist = NULL;
@@ -86,6 +88,13 @@ static void build(struct Live_graph g)
     selectStack = NULL;
     coalescedNodes = NULL;
 }
+
+static bool precolored(G_node n)
+{
+    int *c = G_look(color, n);
+    return *c;
+}
+
 
 static G_node GetAlias(G_node n)
 {
@@ -153,8 +162,9 @@ static void decrementDegree(G_node n)
 {
     int *d = G_look(degree, n);
     int *c = G_look(color, n);
-    *d--;
-    if (*d == K && *c == 0) {
+    int deg = *d;
+    *d = deg - 1;
+    if (deg == K && *c == 0 && G_inNodeList(n, spillWorklist)) {
         enableMoves(G_NodeList(n, adjacent(n)));
         spillWorklist = G_SubNodeList(spillWorklist, G_NodeList(n, NULL));
         if (moveRelated(n)) {
@@ -169,6 +179,8 @@ static void simplify()
 {
     G_node cur = simplifyWorklist->head;
     simplifyWorklist = simplifyWorklist->tail;
+    assert(!precolored(cur));
+    printf("pushed: %d\n", Live_gtemp(cur)->num);
     selectStack = G_NodeList(cur, selectStack);
     for (G_nodeList p = adjacent(cur); p; p = p->tail) {
         decrementDegree(p->head);
@@ -187,7 +199,8 @@ static void freezeMoves(G_node u)
         activeMoves = Live_SubMoveList(activeMoves, Live_MoveList(m->src, m->dst, NULL));
         frozenMoves = Live_UnionMoveList(frozenMoves, Live_MoveList(m->src, m->dst, NULL));
         int *deg = G_look(degree, v);
-        if (!moveRelated(v) && *deg < K) {
+        if (!moveRelated(v) && !precolored(v) && *deg < K) {
+            assert(G_inNodeList(v, freezeWorklist));
             freezeWorklist = G_SubNodeList(freezeWorklist, G_NodeList(v, NULL));
             simplifyWorklist = G_NodeList(v, simplifyWorklist);
         }
@@ -205,15 +218,23 @@ static void freeze()
 static void selectSpill()
 {
     G_node m = spillWorklist->head;
-    spillWorklist = spillWorklist->tail;
+    int max = *(int *)G_look(rank, m);
+    for (G_nodeList p = spillWorklist->tail; p; p = p->tail) {
+        int t = *(int *)G_look(rank, p->head);
+        if (Live_gtemp(p->head)->spilled) {
+            t = 0; /* spilled register has a lower priority to be spilled again */
+        }
+        if (t > max) {
+            max = t;
+            m = p->head;
+        }
+    }
+    Temp_temp a = G_nodeInfo(m);
+    int *d = G_look(degree, m);
+    printf("spill: %d %x %d\n", a->num, adjacent(m), *d);
+    spillWorklist = G_SubNodeList(spillWorklist, G_NodeList(m, NULL));
     simplifyWorklist = G_NodeList(m, simplifyWorklist);
     freezeMoves(m);
-}
-
-static bool precolored(G_node n)
-{
-    int *c = G_look(color, n);
-    return *c;
 }
 
 static bool ok(G_node v, G_node u)
@@ -232,10 +253,16 @@ static bool conservative(G_nodeList nodes)
 {
     int k = 0;
     for (G_nodeList n = nodes; n; n = n->tail) {
+        Temp_temp a = G_nodeInfo(n->head);
+        printf("%d", a->num);
         int *deg = G_look(degree, n->head);
         if (precolored(n->head) || *deg >= K) {
             ++k;
+            printf("+");
+        } else {
+            printf("-");
         }
+        printf("\n");
     }
     return (k < K);
 }
@@ -244,6 +271,7 @@ static void addWorklist(G_node u)
 {
     int * deg = G_look(degree, u);
     if (!precolored(u) && !moveRelated(u) && *deg < K) {
+        assert(G_inNodeList(u, freezeWorklist));
         freezeWorklist = G_SubNodeList(freezeWorklist, G_NodeList(u, NULL));
         simplifyWorklist = G_NodeList(u, simplifyWorklist);
     }
@@ -253,15 +281,21 @@ static void addEdge(G_node u, G_node v)
 {
     bool * cell = G_adjSet(adjSet, G_NodeCount(graph), G_NodeKey(u), G_NodeKey(v));
     if (u != v && !*cell) {
+
+        Temp_temp a = G_nodeInfo(u);
+        Temp_temp b = G_nodeInfo(v);
+        printf("link %d-%d\n", a->num, b->num);
+        *cell = TRUE;
+        cell = G_adjSet(adjSet, G_NodeCount(graph), G_NodeKey(v), G_NodeKey(u));
         *cell = TRUE;
         if (!precolored(u)) {
             int * deg = G_look(degree, u);
-            *deg++;
+            ++(*deg);
             G_addEdge(u, v);
         }
         if (!precolored(v)) {
             int * deg = G_look(degree, v);
-            *deg++;
+            ++(*deg);
             G_addEdge(v, u);
         }
     }
@@ -269,7 +303,10 @@ static void addEdge(G_node u, G_node v)
 
 static void combine(G_node u, G_node v)
 {
-    fprintf(out, "sim: %x\n", simplifyWorklist);
+    Temp_temp a = G_nodeInfo(u);
+    Temp_temp b = G_nodeInfo(v);
+    fprintf(out, "u: %d\n", a->num);
+    fprintf(out, "v: %d\n", b->num);
     fflush(out);
     if (G_inNodeList(v, freezeWorklist)) {
         freezeWorklist = G_SubNodeList(freezeWorklist, G_NodeList(v, NULL));
@@ -277,19 +314,15 @@ static void combine(G_node u, G_node v)
         spillWorklist = G_SubNodeList(spillWorklist, G_NodeList(v, NULL));
     }
     coalescedNodes = G_NodeList(v, coalescedNodes);
-    G_node * a = G_look(alias, v);
-    *a = u;
+    G_node * al = G_look(alias, v);
+    *al = u;
     for (G_nodeList p = adjacent(v); p; p = p->tail) {
         addEdge(p->head, u);
         decrementDegree(p->head);
     }
     int * deg = G_look(degree, u);
     if (*deg >= K && G_inNodeList(u, freezeWorklist)) {
-        fprintf(out, "u: %d\n", precolored(u));
-        fprintf(out, "v: %d\n", precolored(v));
-        fprintf(out, "sim: %x\n", simplifyWorklist);
-        fprintf(out, "spill by combine %d %d\n", ((Temp_temp)G_nodeInfo(u))->num, ((Temp_temp)G_nodeInfo(v))->num);
-        fflush(out);
+        assert(!precolored(u));
         freezeWorklist = G_SubNodeList(freezeWorklist, G_NodeList(u, NULL));
         spillWorklist = G_NodeList(u, spillWorklist);
     }
@@ -309,6 +342,9 @@ static void coalesce()
     }
     worklistMoves = worklistMoves->tail;
 
+    Temp_temp a = G_nodeInfo(u);
+    Temp_temp b = G_nodeInfo(v);
+    printf("coalese: %d %d\n", a->num, b->num);
     bool * cell = G_adjSet(adjSet, G_NodeCount(graph), G_NodeKey(u), G_NodeKey(v));
     if (u == v) {
         coalescedMoves = Live_MoveList(src, dst, coalescedMoves);
@@ -334,13 +370,15 @@ static void assignColors()
     while (selectStack) {
         G_node cur = selectStack->head;
         selectStack = selectStack->tail;
-        /* printf("coloring %d %d\n", Live_gtemp(cur)->num, G_degree(cur)); */
+        printf("coloring %d\n", Live_gtemp(cur)->num);
+        assert(GetAlias(cur) == cur);
+        assert(!precolored(cur));
         for (i = 1; i <= K; ++i) {
             used[i] = FALSE;
         }
         for (G_nodeList p = G_succ(cur); p; p = p->tail) {
             int *t = G_look(color, GetAlias(p->head));
-            /* printf("color of %d is %d\n", Live_gtemp(p->head)->num, *t); */
+            printf("color of %d is %d\n", Live_gtemp(p->head)->num, *t);
             used[*t] = TRUE;
         }
         for (i = 1; i <= K; ++i) {
@@ -350,7 +388,6 @@ static void assignColors()
         }
         if (i > K) {
             spillNodes = G_NodeList(cur, spillNodes);
-            return;
         } else {
             int *c = G_look(color, cur);
             *c = i;
@@ -398,6 +435,7 @@ static void rewriteProgram(F_frame f, AS_instrList *pil)
     while(spillNodes) {
         G_node cur = spillNodes->head;
         spillNodes = spillNodes->tail;
+        assert(!precolored(cur));
         Temp_temp c = Live_gtemp(cur);
 
         off = F_spill(f);
@@ -412,6 +450,7 @@ static void rewriteProgram(F_frame f, AS_instrList *pil)
             if (use && Temp_inTempList(c, *use)) {
                 if (t == NULL) {
                     t = Temp_newtemp();
+                    t->spilled = TRUE;
                 }
                 fprintf(out, "replace: %d -> %d\n", c->num, t->num);
                 fflush(out);
@@ -429,6 +468,7 @@ static void rewriteProgram(F_frame f, AS_instrList *pil)
             if (def && Temp_inTempList(c, *def)) {
                 if (t == NULL) {
                     t = Temp_newtemp();
+                    t->spilled = TRUE;
                 }
                 fprintf(out, "replace: %d -> %d\n", c->num, t->num);
                 fflush(out);
@@ -467,7 +507,9 @@ struct RA_result RA_regAlloc(F_frame f, AS_instrList il) {
     out = fopen("log", "a");
     struct Live_graph live_graph;
     bool done = FALSE;
+    int count = 0;
     while (!done) {
+        ++count;
         fprintf(out, "loop\n");
         fflush(out);
         G_graph flow_graph = FG_AssemFlowGraph(il, f);
