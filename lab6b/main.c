@@ -62,9 +62,10 @@ static void doProc(FILE *out, F_frame frame, T_stm body)
 
  F_tempMap = Temp_empty();
 
+ /* printStmList(stdout, T_StmList(body, NULL)); */
  stmList = C_linearize(body);
  stmList = C_traceSchedule(C_basicBlocks(stmList));
- /* printStmList(stdout, stmList);*/
+ /* printStmList(stdout, stmList); */
  iList  = F_codegen(frame, stmList); /* 9 */
 
  struct RA_result ra = RA_regAlloc(frame, iList);  /* 10, 11 */

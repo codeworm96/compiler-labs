@@ -51,7 +51,7 @@ G_graph FG_AssemFlowGraph(AS_instrList il, F_frame f) {
     TAB_table instr2node = TAB_empty();
     G_graph res = G_Graph();
     G_node last = NULL;
-    for (AS_instrList cur = il; cur != NULL; cur = cur->tail) {
+    for (AS_instrList cur = il; cur; cur = cur->tail) {
         G_node node = G_Node(res, cur->head);
         TAB_enter(instr2node, cur->head, node);
         if (last) {
@@ -62,7 +62,7 @@ G_graph FG_AssemFlowGraph(AS_instrList il, F_frame f) {
             TAB_enter(label2node, cur->head->u.LABEL.label, node);
         }
     }
-    for (AS_instrList cur = il; cur != NULL; cur = cur->tail) {
+    for (AS_instrList cur = il; cur; cur = cur->tail) {
         if (cur->head->kind == I_OPER) {
             G_node node = TAB_look(instr2node, cur->head);
             Temp_labelList ll = cur->head->u.OPER.jumps->labels;

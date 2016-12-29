@@ -75,7 +75,6 @@ Live_moveList Live_MoveList(G_node src, G_node dst, Live_moveList tail) {
     }
 }
 
-
 Temp_temp Live_gtemp(G_node n) {
     return G_nodeInfo(n);
 }
@@ -107,7 +106,7 @@ static void link(struct Live_graph *g, Temp_temp temp_a, Temp_temp temp_b, TAB_t
 
     bool * cell = G_adjSet(g->adj, G_NodeCount(g->graph), G_NodeKey(a), G_NodeKey(b));
     if (!*cell) {
-        printf("link %d-%d\n", temp_a->num, temp_b->num);
+        /* printf("link %d-%d\n", temp_a->num, temp_b->num); */
 
         *cell = TRUE;
         cell = G_adjSet(g->adj, G_NodeCount(g->graph), G_NodeKey(b), G_NodeKey(a));
@@ -154,7 +153,7 @@ struct Live_graph Live_liveness(G_graph flow) {
             }
         }
     }
-    res.moves = NULL; // TODO
+    res.moves = NULL;
     res.graph = G_Graph();
     res.rank = G_empty();
 
@@ -162,10 +161,11 @@ struct Live_graph Live_liveness(G_graph flow) {
     for (Temp_tempList m = MachineRegs(); m; m = m->tail) {
         get_node(res.graph, m->head, temp2node);
     }
-    for (p = G_nodes(flow); p != NULL; p = p->tail) {
+    for (p = G_nodes(flow); p; p = p->tail) {
         for (Temp_tempList def = FG_def(p->head); def; def = def->tail) {
             if (def->head != F_FP()) {
                 int * r = checked_malloc(sizeof(int));
+                *r = 0;
                 G_enter(res.rank, get_node(res.graph, def->head, temp2node), r);
             }
         }
@@ -181,23 +181,25 @@ struct Live_graph Live_liveness(G_graph flow) {
         }
     }
 
-    for (p = G_nodes(flow); p != NULL; p = p->tail) {
+    for (p = G_nodes(flow); p; p = p->tail) {
         Temp_tempList outp = *(Temp_tempList*)G_look(out, p->head), op;
         AS_instr inst = G_nodeInfo(p->head);
         if (inst->kind == I_MOVE) {
             outp = Temp_SubTempList(outp, FG_use(p->head));
             for (Temp_tempList def = FG_def(p->head); def; def = def->tail) {
                 for (Temp_tempList use = FG_use(p->head); use; use = use->tail) {
-                    printf("move: %d-%d\n", def->head->num, use->head->num);
+                    /* printf("move: %d-%d\n", def->head->num, use->head->num); */
                     res.moves = Live_MoveList(get_node(res.graph, use->head, temp2node),
                             get_node(res.graph, def->head, temp2node),
                             res.moves);
                 }
             }
         }
+        /*
         printf("%s:", inst->u.MOVE.assem);
         Temp_DumpTempList(outp);
         printf("\n");
+        */
 
         for (Temp_tempList def = FG_def(p->head); def; def = def->tail) {
             for (op = outp; op; op = op->tail) {
